@@ -1,0 +1,294 @@
+@import 'tailwindcss';
+@import '@fontsource/geist-sans/400.css';
+@import '@fontsource/geist-sans/500.css';
+@import '@fontsource/geist-sans/600.css';
+@import '@fontsource/geist-sans/700.css';
+@import '@fontsource/geist-mono/400.css';
+@import '@fontsource/geist-mono/500.css';
+@import '@fontsource/geist-mono/600.css';
+@import '@fontsource/geist-mono/700.css';
+@import '@xyflow/react/dist/base.css';
+
+/* Token del design (README di handoff, "Design Tokens"). Scuro predefinito. */
+:root {
+  --bg: #0b0d11;
+  --dot: #222833;
+  --panel: #111419;
+  --raised: #161a20;
+  --sunken: #0d1014;
+  --hover: #1c2129;
+  --line: #20252d;
+  --line2: #2c323c;
+  --tx: #e7e9ed;
+  --tx2: #a1a7b2;
+  --tx3: #6d7480;
+  --ac: #8ea2ff;
+  --acbg: rgba(142, 162, 255, 0.13);
+  --acln: rgba(142, 162, 255, 0.45);
+  --neu: #9aa1ad;
+  --neubg: rgba(154, 161, 173, 0.12);
+  --safe: #44c4a9;
+  --safebg: rgba(68, 196, 169, 0.13);
+  --warn: #f0a33a;
+  --warnbg: rgba(240, 163, 58, 0.13);
+  --err: #f2636d;
+  --errbg: rgba(242, 99, 109, 0.15);
+  --st1: #161a20;
+  --st2: #1b2028;
+  --shadow: 0 24px 64px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.4);
+  --scrim: rgba(5, 6, 9, 0.62);
+  --grp: rgba(142, 162, 255, 0.03);
+  --grpln: #272e3a;
+  --btn: #e7e9ed;
+  --btntx: #0b0d11;
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  --bg: #f3f4f6;
+  --dot: #d3d7de;
+  --panel: #ffffff;
+  --raised: #ffffff;
+  --sunken: #f6f7f9;
+  --hover: #eff1f4;
+  --line: #e4e7ec;
+  --line2: #d3d8df;
+  --tx: #0f1217;
+  --tx2: #4b5260;
+  --tx3: #737a88;
+  --ac: #4257e8;
+  --acbg: rgba(66, 87, 232, 0.09);
+  --acln: rgba(66, 87, 232, 0.45);
+  --neu: #5f6673;
+  --neubg: rgba(95, 102, 115, 0.09);
+  --safe: #0e8f78;
+  --safebg: rgba(14, 143, 120, 0.1);
+  --warn: #b56a00;
+  --warnbg: rgba(201, 122, 0, 0.1);
+  --err: #d1323e;
+  --errbg: rgba(209, 50, 62, 0.08);
+  --st1: #eef0f3;
+  --st2: #e5e8ec;
+  --shadow: 0 24px 64px rgba(15, 18, 23, 0.18), 0 2px 8px rgba(15, 18, 23, 0.08);
+  --scrim: rgba(15, 18, 23, 0.28);
+  --grp: rgba(66, 87, 232, 0.025);
+  --grpln: #cdd3dd;
+  --btn: #0f1217;
+  --btntx: #ffffff;
+  color-scheme: light;
+}
+
+@theme inline {
+  --font-sans: 'Geist Sans', system-ui, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-raised: var(--raised);
+  --color-sunken: var(--sunken);
+  --color-hover: var(--hover);
+  --color-line: var(--line);
+  --color-line2: var(--line2);
+  --color-tx: var(--tx);
+  --color-tx2: var(--tx2);
+  --color-tx3: var(--tx3);
+  --color-ac: var(--ac);
+  --color-acbg: var(--acbg);
+  --color-acln: var(--acln);
+  --color-neu: var(--neu);
+  --color-neubg: var(--neubg);
+  --color-safe: var(--safe);
+  --color-safebg: var(--safebg);
+  --color-warn: var(--warn);
+  --color-warnbg: var(--warnbg);
+  --color-err: var(--err);
+  --color-errbg: var(--errbg);
+  --color-btn: var(--btn);
+  --color-btntx: var(--btntx);
+  --color-grpln: var(--grpln);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background: var(--bg);
+  color: var(--tx);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+/* Barra del titolo trascinabile; i controlli interni no. */
+.drag {
+  -webkit-app-region: drag;
+}
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* Segnaposto immagine a righe diagonali. */
+.stripes {
+  background: repeating-linear-gradient(135deg, var(--st1) 0 6px, var(--st2) 6px 12px);
+}
+
+.react-flow__node {
+  font-family: var(--font-sans);
+}
+.react-flow__handle {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ac);
+  border: 2px solid var(--bg);
+  opacity: 0;
+}
+.react-flow__node.selected .react-flow__handle,
+.react-flow__node:hover .react-flow__handle {
+  opacity: 1;
+}
+.react-flow__edge-path {
+  stroke: var(--line2);
+  stroke-width: 1.5;
+}
+.react-flow__connectionline path {
+  stroke: var(--ac);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+}
+
+/* Dimensione del testo di pannelli e schede (Impostazioni › Aspetto). */
+:root {
+  --text-scale: 1;
+}
+[data-text-scale] {
+  zoom: var(--text-scale);
+}
+
+/* Anteprima dei documenti di progetto. */
+.markdown-preview {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--tx);
+  user-select: text;
+}
+.markdown-preview h1 {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 12px;
+}
+.markdown-preview h2 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 20px 0 8px;
+}
+.markdown-preview h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 16px 0 6px;
+}
+.markdown-preview p,
+.markdown-preview ul,
+.markdown-preview ol {
+  margin: 0 0 10px;
+}
+.markdown-preview ul,
+.markdown-preview ol {
+  padding-left: 20px;
+}
+.markdown-preview blockquote {
+  margin: 0 0 10px;
+  padding: 6px 12px;
+  border-left: 3px solid var(--line2);
+  color: var(--tx2);
+  background: var(--sunken);
+  border-radius: 0 6px 6px 0;
+}
+.markdown-preview code {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  background: var(--sunken);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+.markdown-preview .entity-link {
+  display: inline-flex;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid var(--acln);
+  background: var(--acbg);
+  color: var(--ac);
+  font-weight: 500;
+  font-size: 0.92em;
+  cursor: pointer;
+  text-decoration: none;
+}
+.markdown-preview .entity-link.warn {
+  border-color: color-mix(in srgb, var(--warn) 45%, transparent);
+  background: var(--warnbg);
+  color: var(--warn);
+}
+.markdown-preview .ext-link {
+  color: var(--ac);
+}
+
+/* Gruppi: il riquadro del nodo non intercetta il mouse (altrimenti copre i gruppi interni e le scene);
+   rispondono solo l'etichetta, che è anche la maniglia di trascinamento. */
+.react-flow__node-sceneGroup {
+  pointer-events: none !important;
+}
+.react-flow__node-sceneGroup .group-handle {
+  pointer-events: auto;
+}
+/* Cursori: mano chiusa mentre si sposta la vista col tasto centrale o si trascina un gruppo. */
+.react-flow__pane,
+.react-flow__pane.draggable,
+.react-flow__pane.selection {
+  cursor: default;
+}
+body.is-panning,
+body.is-panning *,
+body.is-dragging-group,
+body.is-dragging-group * {
+  cursor: grabbing !important;
+}
+
+/* Tema del dock delle schede (dockview): usa i token dell'app, quindi segue chiaro/scuro da solo. */
+.dockview-theme-graforum {
+  --dv-group-view-background-color: var(--panel);
+  --dv-tabs-and-actions-container-background-color: var(--sunken);
+  --dv-tabs-and-actions-container-height: 30px;
+  --dv-tabs-and-actions-container-font-size: 12px;
+  --dv-activegroup-visiblepanel-tab-background-color: var(--panel);
+  --dv-activegroup-hiddenpanel-tab-background-color: var(--sunken);
+  --dv-inactivegroup-visiblepanel-tab-background-color: var(--panel);
+  --dv-inactivegroup-hiddenpanel-tab-background-color: var(--sunken);
+  --dv-tab-divider-color: var(--line);
+  --dv-activegroup-visiblepanel-tab-color: var(--tx);
+  --dv-activegroup-hiddenpanel-tab-color: var(--tx3);
+  --dv-inactivegroup-visiblepanel-tab-color: var(--tx2);
+  --dv-inactivegroup-hiddenpanel-tab-color: var(--tx3);
+  --dv-separator-border: var(--line);
+  --dv-paneview-header-border-color: var(--line);
+  --dv-icon-hover-background-color: var(--hover);
+  --dv-drag-over-background-color: var(--acbg);
+  --dv-drag-over-border-color: var(--acln);
+  --dv-sash-color: var(--line);
+  --dv-active-sash-color: var(--ac);
+  --dv-floating-box-shadow: var(--shadow);
+  --dv-floating-border: 1px solid var(--line2);
+  --dv-tab-font-size: 12px;
+}
+.dockview-theme-graforum .dv-tab.dv-active-tab {
+  box-shadow: inset 0 2px 0 var(--ac);
+}
+/* Una scheda nascosta (altra linguetta attiva) non deve far trasparire i nodi di React Flow, che impostano da sé visibility: visible. */
+.dv-render-overlay[style*='visibility: hidden'] * {
+  visibility: hidden !important;
+}

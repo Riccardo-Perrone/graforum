@@ -3,9 +3,16 @@ import { createPortal } from 'react-dom'
 import { AppWindow, Copy, FolderInput, FolderMinus, FolderOutput, ListTree, PanelTop, Play, Plus, SquareDashed, Trash2, Waypoints } from 'lucide-react'
 import { apply, useProject } from '../../lib/entities'
 import { useKbd } from '../../lib/commands'
-import { createScene, deleteScene, duplicateScene, groupSelection, removeFromGroup, removeGroupFromParent, ungroup } from '../../lib/sceneOps'
+import { useCloseKey } from '../../lib/shortcuts'
+import { playFromScene } from '../../lib/playtest'
+import { createScene, deleteScenes, duplicateScene, groupSelection, removeFromGroup, removeGroupFromParent, ungroup } from '../../lib/sceneOps'
 import { openEntity, useUiStore } from '../../store/ui'
 import { Kbd } from '../ui/primitives'
+import { sceneTopLeft } from './buildGraph'
+
+/** Intestazione del menu della selezione: scene e gruppi collassati. */
+const selectionLabel = (scenes: number, cards: number) =>
+  [scenes ? `${scenes} SCENE` : '', cards ? `${cards} ${cards === 1 ? 'GRUPPO' : 'GRUPPI'}` : ''].filter(Boolean).join(' + ') + (scenes + cards === 1 ? ' SELEZIONATA' : ' SELEZIONATE')
 
 export interface MenuState {
   x: number
@@ -38,6 +45,8 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose(): voi
   const kbdGroup = useKbd('groupSelection')
   const kbdNew = useKbd('newScene')
   const kbdHere = useKbd('playFromHere')
+  const kbdDelete = useKbd('deleteSelection')
+  useCloseKey(onClose)
   // Il menu agisce su tutta la selezione se la scena cliccata ne fa parte.
   const targets = menu.kind === 'selection' || (scene && ui.selectedSceneIds.includes(scene.id)) ? ui.selectedSceneIds : scene ? [scene.id] : []
   const inGroup = p.scenes.some((s) => targets.includes(s.id) && s.groupId)
@@ -64,7 +73,7 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose(): voi
             <Item icon={<AppWindow size={13} />} onClick={run(() => ui.openSheet({ kind: 'scene', id: scene.id }))}>
               Apri in finestra al centro
             </Item>
-            <Item icon={<Play size={13} />} kbd={kbdHere} onClick={run(() => ui.setView({ kind: 'playtest', startSceneId: scene.id }))}>
+            <Item icon={<Play size={13} />} kbd={kbdHere} onClick={run(() => playFromScene(scene.id))}>
               Parti da qui
             </Item>
             <Item icon={<ListTree size={13} />} onClick={run(() => ui.openSheet({ kind: 'cross', tab: 'progress', scopeSceneId: scene.id }))}>
@@ -76,7 +85,7 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose(): voi
             <Item icon={<Copy size={13} />} onClick={run(() => duplicateScene(scene.id))}>
               Duplica
             </Item>
-            {ui.selectedSceneIds.length > 0 && (
+            {(ui.selectedSceneIds.length > 0 || ui.selectedCardIds.length > 0) && (
               <Item icon={<SquareDashed size={13} />} kbd={kbdGroup} onClick={run(() => groupSelection())}>
                 Raggruppa la selezione
               </Item>
@@ -85,18 +94,20 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose(): voi
             <Item
               icon={<Trash2 size={13} />}
               danger
+              kbd={kbdDelete}
               onClick={run(async () => {
-                const owners = await deleteScene(scene.id)
-                if (owners) ui.showBlocked({ name: scene.title, owners })
+                // Come gli altri comandi del menu: agisce su tutta la selezione se la scena ne fa parte.
+                const blocked = await deleteScenes(targets)
+                if (blocked) ui.showBlocked(blocked)
               })}
             >
-              Elimina
+              {many ? `Elimina ${targets.length} scene` : 'Elimina'}
             </Item>
           </>
         )}
         {menu.kind === 'selection' && (
           <>
-            <span className="px-2 py-1 font-mono text-[9.5px] font-semibold tracking-[.08em] text-tx3">{ui.selectedSceneIds.length} SCENE SELEZIONATE</span>
+            <span className="px-2 py-1 font-mono text-[9.5px] font-semibold tracking-[.08em] text-tx3">{selectionLabel(ui.selectedSceneIds.length, ui.selectedCardIds.length)}</span>
             <Item icon={<SquareDashed size={13} />} kbd={kbdGroup} onClick={run(() => groupSelection())}>
               Raggruppa la selezione
             </Item>
@@ -112,7 +123,7 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose(): voi
             <Item icon={<AppWindow size={13} />} onClick={run(() => ui.openSheet({ kind: 'group', id: group.id }))}>
               Apri in finestra al centro
             </Item>
-            <Item icon={<FolderInput size={13} />} onClick={run(() => apply('Collassa gruppo', (d) => void (d.groups.find((g) => g.id === group.id)!.collapsed = !group.collapsed)))}>
+            <Item icon={<FolderInput size={13} />} onClick={run(() => apply(group.collapsed ? 'Espandi gruppo' : 'Collassa gruppo', (d) => void (d.groups.find((g) => g.id === group.id)!.collapsed = !group.collapsed)))}>
               {group.collapsed ? 'Espandi' : 'Collassa'}
             </Item>
             {group.parentId && (
@@ -127,10 +138,10 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose(): voi
         )}
         {menu.kind === 'pane' && (
           <>
-            <Item icon={<Plus size={13} />} kbd={kbdNew} onClick={run(() => createScene({ x: (menu.flowPos?.x ?? 0) - 100, y: (menu.flowPos?.y ?? 0) - 68 }))}>
+            <Item icon={<Plus size={13} />} kbd={kbdNew} onClick={run(() => createScene(sceneTopLeft(menu.flowPos ?? { x: 0, y: 0 })))}>
               Nuova scena qui
             </Item>
-            {ui.selectedSceneIds.length > 0 && (
+            {(ui.selectedSceneIds.length > 0 || ui.selectedCardIds.length > 0) && (
               <Item icon={<SquareDashed size={13} />} kbd={kbdGroup} onClick={run(() => groupSelection())}>
                 Raggruppa la selezione
               </Item>

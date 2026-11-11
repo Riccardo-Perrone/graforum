@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { importProjectJson, newProject, openProject, openSample, saveProject } from '../../lib/fileActions'
-import { groupSelection } from '../../lib/sceneOps'
+import { canGroupSelection, groupSelection } from '../../lib/sceneOps'
 import { kbdLabel } from '../../lib/commands'
 import { useCommand } from '../../lib/shortcuts'
+import { playFromStart } from '../../lib/playtest'
 import { useProjectStore } from '../../store/project'
 import { dockBridge, type PanelId } from '../../dock/bridge'
 import { PANEL_LIST } from '../../dock/panelList'
@@ -22,7 +23,7 @@ interface Item {
 const ui = () => useUiStore.getState()
 const sep: Item = { label: '', separator: true }
 
-function menus(hasProject: boolean, canUndo: boolean, canRedo: boolean): [string, Item[]][] {
+function menus(hasProject: boolean, canUndo: boolean, canRedo: boolean, canPlay: boolean): [string, Item[]][] {
   const needs = !hasProject
   const view = (v: View) => () => ui().setView(v)
   return [
@@ -48,7 +49,7 @@ function menus(hasProject: boolean, canUndo: boolean, canRedo: boolean): [string
         { label: 'Annulla', kbd: kbdLabel('undo'), run: () => useProjectStore.getState().undo(), disabled: !canUndo },
         { label: 'Ripeti', kbd: kbdLabel('redo'), run: () => useProjectStore.getState().redo(), disabled: !canRedo },
         sep,
-        { label: 'Raggruppa la selezione', kbd: kbdLabel('groupSelection'), run: () => void groupSelection(), disabled: needs || ui().selectedSceneIds.length === 0 },
+        { label: 'Raggruppa la selezione', kbd: kbdLabel('groupSelection'), run: () => void groupSelection(), disabled: needs || !canGroupSelection() },
         { label: 'Libreria immagini', run: () => ui().openSheet({ kind: 'images' }), disabled: needs }
       ]
     ],
@@ -95,7 +96,7 @@ function menus(hasProject: boolean, canUndo: boolean, canRedo: boolean): [string
         { label: 'Abilità', run: () => ui().openSheet({ kind: 'settings', page: 'skills' }), disabled: needs },
         { label: 'Flag', run: () => ui().openSheet({ kind: 'settings', page: 'flags' }), disabled: needs },
         sep,
-        { label: 'Playtest', kbd: kbdLabel('playFromStart'), run: view({ kind: 'playtest', startSceneId: null }), disabled: needs },
+        { label: 'Playtest', kbd: kbdLabel('playFromStart'), run: playFromStart, disabled: needs || !canPlay },
         { label: 'Esporta…', kbd: kbdLabel('export'), run: () => ui().openSheet({ kind: 'export' }), disabled: needs }
       ]
     ],
@@ -115,12 +116,13 @@ export function MenuBar() {
   const hasProject = useProjectStore((s) => s.project !== null)
   const canUndo = useProjectStore((s) => s.past.length > 0)
   const canRedo = useProjectStore((s) => s.future.length > 0)
+  const canPlay = useProjectStore((s) => !!s.project?.startSceneId)
   const [open, setOpen] = useState<string | null>(null)
   const ref = useClickOutside<HTMLElement>(() => setOpen(null), open !== null)
   useCommand('export', () => hasProject && ui().openSheet({ kind: 'export' }))
   useUiStore((st) => st.shortcuts) // ridisegna i menu quando cambiano le scorciatoie
   useUiStore((st) => st.openPanels) // e quando si aprono o chiudono le schede
-  const list = menus(hasProject, canUndo, canRedo)
+  const list = menus(hasProject, canUndo, canRedo, canPlay)
 
   return (
     <nav ref={ref} className="no-drag relative flex gap-0.5 text-[12.5px] text-tx2">

@@ -30,7 +30,7 @@ Il codice di riferimento è `src/shared/model/` (schemi Zod): questo documento n
 - Ogni entità ha un `id` stabile: prefisso di tipo + 10 caratteri casuali (es. `scn_V1StGXR8Z5`). Non cambia mai, nemmeno rinominando.
 - Prefissi: `scn` scena, `lnk` collegamento, `grp` gruppo, `end` finale, `prj` progetto, `lbl` etichetta di scena, `npc`, `eny` enemy, `itm` oggetto, `qst` quest, `stp` step, `dlg` dialogo, `dln` battuta, `dch` scelta, `enc` incontro, `img` immagine, `flg` flag, `chk` skill check, `sit` oggetto in scena, `doc` documento, `pre` preset, `ctp` tipo di condizione custom, `skl` abilità, `ityp` tipo di oggetto, `cfd` campo custom.
 - Un riferimento generico è `{ type, id }` (es. `{ "type": "scene", "id": "scn_…" }`).
-- **Eliminazione:** bloccata se l'entità è usata; si mostra l'elenco "Usato in".
+- **Eliminazione:** bloccata se l'entità è usata; si mostra l'elenco "Usato in". Eliminando una scena spariscono anche i suoi collegamenti, il suo finale e gli incontri che non stanno in altre scene; se uno di questi è usato altrove l'eliminazione si blocca.
 
 ## 2. Progetto e file
 
@@ -75,7 +75,7 @@ Albero di gruppi e foglie.
 
 ### Gate (visibilità/accesso)
 
-`{ condition, whenUnmet: hidden | locked, lockedMessage }`. Si usa su scene, collegamenti, scelte di dialogo, oggetti in scena, dialoghi assegnati agli NPC e merce dei negozi.
+`{ condition, whenUnmet: hidden | locked, lockedMessage }`. Si usa su scene (`access`), collegamenti, scelte di dialogo, oggetti in scena, presenze degli NPC nelle scene, dialoghi assegnati agli NPC e merce dei negozi.
 
 ### Effetto
 
@@ -109,7 +109,7 @@ Durante il playtest (e per l'export) alcune cose diventano fatti senza bisogno d
 | labelIds | rif. etichette | Etichette personalizzate di scena, definite nelle impostazioni (§7) |
 | cover | oggetto, opzionale | Copertina stile Trello: immagine e/o colore, `strip` (fascia) o `full` (intera) |
 | groupId | rif. gruppo | Opzionale |
-| npcs | elenco di presenze | Presenza = NPC + dialoghi in ordine, ognuno con gate; vale il primo soddisfatto |
+| npcs | elenco di presenze | Presenza = NPC con il suo gate + dialoghi in ordine, ognuno con gate; vale il primo soddisfatto |
 | items | elenco di oggetti in scena | Oggetto, quantità, gate, prove alternative opzionali (es. cassa: FOR 15 o DES 14) |
 | encounterIds | rif. incontri | Solo Warning |
 | access | gate | Opzionale |
@@ -129,11 +129,13 @@ La scena di partenza è `project.startSceneId`; una scena è finale se un Finale
 
 ### Finale
 
-`sceneId`, `label`, `color` (tavolozza del design), `manualDecisive[]` (collegamenti o scelte segnati a mano, si sommano al calcolo automatico).
+`sceneId`, `label`, `color` (tavolozza del design, `ENDING_COLORS`: i finali nuovi la usano a rotazione), `manualDecisive[]` (collegamenti o scelte segnati a mano, si sommano al calcolo automatico).
 
 ### Incontro
 
 `name`, `enemies[]` (enemy + quantità), `nature` unico / ripetibile, `rewards` (XP + oggetti), `outcomes`: `win`, `flee`, `defeat`, ognuno `{ target scena opzionale, effects }`.
+
+Un incontro esiste solo dentro le scene (`scene.encounterIds`): quando non è più in nessuna scena si elimina. La validazione segnala quelli rimasti senza scena da file precedenti.
 
 ## 5. Cataloghi
 
@@ -176,10 +178,10 @@ Se un requisito non ha nessuna fonte, la validazione lo segnala.
 
 ### Dialogo
 
-`npcId`, `title`, `startNodeId`, `nodes[]`.
+`npcId`, `title`, `startLineId` (battuta iniziale), `lines[]`.
 
-- **Battuta:** `speaker` (NPC proprietario, giocatore o altro con nome), `text`, `effects`, `choices[]`, `position`. Zero scelte = fine.
-- **Scelta:** `text`, `target` (battuta, oppure vuoto = chiude il dialogo), `gate`, `effects`, `check` opzionale.
+- **Battuta:** `speaker` (`npc` = NPC proprietario, `player` = giocatore, `other` con `name`), `text`, `effects`, `choices[]`, `position`. Zero scelte = fine.
+- **Scelta:** `text`, `targetLineId` (battuta di destinazione, oppure null = chiude il dialogo), `gate`, `effects`, `check` opzionale.
 
 Un dialogo è "solo contesto" se non contiene effetti né prove: è calcolato, non salvato.
 

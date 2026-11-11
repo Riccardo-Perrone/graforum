@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import type { DockviewApi, DockviewGroupPanel } from 'dockview-react'
 import { Check, MoreHorizontal } from 'lucide-react'
 import { IconButton, cn } from '../components/ui/primitives'
+import { useCloseKey } from '../lib/shortcuts'
 import { useUiStore } from '../store/ui'
 import type { PanelId } from './bridge'
 import { openPanelIn } from './layout'
@@ -24,14 +25,10 @@ export function PanelMenu({ api, group }: { api: DockviewApi; group: DockviewGro
     if (!at) return
     const d = doc()
     const close = () => setAt(null)
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close()
     d.addEventListener('mousedown', close)
-    d.addEventListener('keydown', onKey)
-    return () => {
-      d.removeEventListener('mousedown', close)
-      d.removeEventListener('keydown', onKey)
-    }
+    return () => d.removeEventListener('mousedown', close)
   }, [at])
+  useCloseKey(() => setAt(null), at !== null, doc)
 
   const choose = (id: PanelId) => {
     setAt(null)

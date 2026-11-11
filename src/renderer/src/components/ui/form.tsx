@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react'
 import { cn } from './primitives'
+import { useCloseKey } from '../../lib/shortcuts'
 
 // Controlli di form densi (30–32px, raggio 6) nello stile del design.
 
@@ -186,8 +187,10 @@ export function AddButton({ children, onClick }: { children: ReactNode; onClick(
 }
 
 /** Chiude al clic fuori dall'elemento. */
+/** Chiude un menu a comparsa con un clic fuori dall'elemento o con la combinazione di chiusura (Esc predefinito). */
 export function useClickOutside<T extends HTMLElement>(onOutside: () => void, active = true) {
   const ref = useRef<T>(null)
+  useCloseKey(onOutside, active)
   useEffect(() => {
     if (!active) return
     const h = (e: MouseEvent) => ref.current && !ref.current.contains(e.target as Node) && onOutside()

@@ -17,6 +17,14 @@ export interface EffectSite extends Site {
   effect: Effect
 }
 
+/** Scene in cui il dialogo è assegnato a un NPC presente. */
+export function scenesWithDialog(p: Project, dialogId: string): Project['scenes'] {
+  return p.scenes.filter((s) => s.npcs.some((n) => n.dialogs.some((d) => d.dialogId === dialogId)))
+}
+
+/** Oggetti ricevuti (ricompense, bottino, merce) visti come effetti "ottiene". */
+const gains = (items: { itemId: string; quantity: number }[]): Effect[] => items.map((r) => ({ type: 'gainItem', itemId: r.itemId, quantity: r.quantity }))
+
 export function effectSites(p: Project): EffectSite[] {
   const out: EffectSite[] = []
   const push = (type: EntityType, id: string, label: string, where: string, effects: Effect[]) =>
@@ -29,7 +37,7 @@ export function effectSites(p: Project): EffectSite[] {
       push('scene', s.id, s.title, 'prova all’ingresso fallita', s.entryCheck.failure.effects)
     }
     for (const i of s.items) {
-      push('scene', s.id, s.title, 'oggetto presente', [{ type: 'gainItem', itemId: i.itemId, quantity: i.quantity }])
+      push('scene', s.id, s.title, 'oggetto presente', gains([i]))
       for (const c of i.checks) push('scene', s.id, s.title, 'prova sull’oggetto', [...c.success.effects, ...c.failure.effects])
     }
   }
@@ -58,17 +66,17 @@ export function effectSites(p: Project): EffectSite[] {
     push('encounter', e.id, e.name, 'vittoria', e.outcomes.win.effects)
     push('encounter', e.id, e.name, 'fuga', e.outcomes.flee.effects)
     push('encounter', e.id, e.name, 'sconfitta', e.outcomes.defeat.effects)
-    push('encounter', e.id, e.name, 'ricompensa', e.rewards.items.map((r) => ({ type: 'gainItem' as const, itemId: r.itemId, quantity: r.quantity })))
+    push('encounter', e.id, e.name, 'ricompensa', gains(e.rewards.items))
   }
   for (const q of p.quests) {
-    push('quest', q.id, q.title, 'ricompensa', q.rewards.items.map((r) => ({ type: 'gainItem' as const, itemId: r.itemId, quantity: r.quantity })))
+    push('quest', q.id, q.title, 'ricompensa', gains(q.rewards.items))
   }
   for (const n of p.npcs) {
-    push('npc', n.id, n.name, 'negozio', n.services.shop.map((s) => ({ type: 'gainItem' as const, itemId: s.itemId, quantity: 1 })))
-    push('npc', n.id, n.name, 'bottino', n.loot.items.map((r) => ({ type: 'gainItem' as const, itemId: r.itemId, quantity: r.quantity })))
+    push('npc', n.id, n.name, 'negozio', gains(n.services.shop.map((s) => ({ itemId: s.itemId, quantity: 1 }))))
+    push('npc', n.id, n.name, 'bottino', gains(n.loot.items))
   }
   for (const n of p.enemies) {
-    push('enemy', n.id, n.name, 'bottino', n.loot.items.map((r) => ({ type: 'gainItem' as const, itemId: r.itemId, quantity: r.quantity })))
+    push('enemy', n.id, n.name, 'bottino', gains(n.loot.items))
   }
   return out
 }
@@ -81,8 +89,6 @@ export function leaves(c: Condition | null): ConditionLeaf[] {
 /** Fonti che possono rendere vera una condizione semplice. Vuoto = nessuno la soddisfa. */
 export function sourcesOf(p: Project, leaf: ConditionLeaf, sites = effectSites(p)): Site[] {
   const site = (type: EntityType, id: string, where: string): Site => ({ type, id, label: entityName(p, type, id), where })
-  const scenesWithDialog = (dialogId: string) =>
-    p.scenes.filter((s) => s.npcs.some((n) => n.dialogs.some((d) => d.dialogId === dialogId)))
   switch (leaf.type) {
     case 'hasItem':
       return sites.filter((s) => s.effect.type === 'gainItem' && s.effect.itemId === leaf.itemId)
@@ -95,9 +101,9 @@ export function sourcesOf(p: Project, leaf: ConditionLeaf, sites = effectSites(p
           .flatMap((q) => q.steps.filter((st) => st.requirements && (!leaf.stepId || st.id === leaf.stepId)).map((st) => site('quest', q.id, `requisiti dello step «${st.title}»`)))
       ]
     case 'dialogCompleted':
-      return scenesWithDialog(leaf.dialogId).map((s) => ({ ...site('dialog', leaf.dialogId, `in ${s.title}`) }))
+      return scenesWithDialog(p, leaf.dialogId).map((s) => ({ ...site('dialog', leaf.dialogId, `in ${s.title}`) }))
     case 'dialogChoice':
-      return scenesWithDialog(leaf.dialogId).length ? [site('dialog', leaf.dialogId, `scelta ${entityName(p, 'dialogChoice', leaf.choiceId)}`)] : []
+      return scenesWithDialog(p, leaf.dialogId).length ? [site('dialog', leaf.dialogId, `scelta ${entityName(p, 'dialogChoice', leaf.choiceId)}`)] : []
     case 'talkedTo':
       return p.scenes.filter((s) => s.npcs.some((n) => n.npcId === leaf.npcId && n.dialogs.length)).map((s) => site('scene', s.id, 'dialogo con l’NPC'))
     case 'encounterOutcome':

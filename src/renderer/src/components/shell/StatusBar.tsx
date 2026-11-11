@@ -1,6 +1,6 @@
-import { useMemo } from 'react'
 import { CircleAlert, Moon, OctagonX, Sun } from 'lucide-react'
-import { validate } from '@shared/engine'
+import { entityName, selectionParts, validateCached } from '@shared/engine'
+import { useKbd } from '../../lib/commands'
 import { useProjectStore } from '../../store/project'
 import { effectiveTheme, useUiStore } from '../../store/ui'
 
@@ -8,19 +8,24 @@ export function StatusBar() {
   const project = useProjectStore((s) => s.project)
   const savedAt = useProjectStore((s) => s.savedAt)
   const filePath = useProjectStore((s) => s.filePath)
-  const { zoom, selectedSceneIds } = useUiStore()
+  const { zoom, selectedSceneIds, selectedCardIds } = useUiStore()
   const theme = effectiveTheme(useUiStore((s) => s.theme))
-  const issues = useMemo(() => (project ? validate(project) : []), [project])
+  const kbdSave = useKbd('save')
   if (!project) return null
+  const issues = validateCached(project)
   const errors = issues.filter((i) => i.severity === 'error').length
   const warnings = issues.filter((i) => i.severity === 'warning').length
 
-  const selected =
+  // Gruppi selezionati per intero (tutte le scene o la carta collassata): si nominano accanto alle scene.
+  const wholeGroups = selectionParts(project, selectedSceneIds, selectedCardIds).groupIds
+  const groupsText = wholeGroups.length === 1 ? `gruppo ${entityName(project, 'group', wholeGroups[0])}` : wholeGroups.length > 1 ? `${wholeGroups.length} gruppi` : ''
+  const scenesText =
     selectedSceneIds.length === 1
-      ? project.scenes.find((s) => s.id === selectedSceneIds[0])?.title
+      ? (project.scenes.find((s) => s.id === selectedSceneIds[0])?.title ?? '')
       : selectedSceneIds.length > 1
         ? `${selectedSceneIds.length} scene`
-        : 'nessuna'
+        : ''
+  const selected = [scenesText, groupsText].filter(Boolean).join(' · ') || 'nessuna'
 
   return (
     <footer className="flex h-[26px] flex-none items-center gap-[18px] border-t border-line bg-panel px-3 font-mono text-[11px] font-medium text-tx3">
@@ -40,7 +45,7 @@ export function StatusBar() {
       <span>
         {filePath
           ? `Salvataggio automatico${savedAt ? ` · ${savedAt.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}` : ''}`
-          : 'Non ancora salvato · Ctrl+S'}
+          : `Non ancora salvato${kbdSave ? ` · ${kbdSave}` : ''}`}
       </span>
       <span>Zoom {Math.round(zoom * 100)}%</span>
       <span className="flex items-center gap-[5px]">

@@ -1,11 +1,13 @@
 import { useMemo, type ReactNode } from 'react'
-import { KeyRound, Package, Plus, ScrollText, Search } from 'lucide-react'
+import { KeyRound, Package, Plus, ScrollText } from 'lucide-react'
 import { buildUsageIndex, type Project } from '@shared/model'
+import { matchesQuery } from '@shared/engine'
 import { createEntity } from '../../lib/entities'
 import { useProjectStore } from '../../store/project'
 import { openEntity, useUiStore, type CatalogTab } from '../../store/ui'
 import { CATALOG_DRAG_TYPE } from '../graph/GraphCanvas'
 import { IconButton, cn } from '../ui/primitives'
+import { SearchInput } from '../ui/SearchInput'
 
 const TABS: [CatalogTab, string][] = [
   ['all', 'Tutti'],
@@ -96,10 +98,9 @@ export function CatalogPanel() {
   const { catalogTab, catalogQuery, setCatalogTab, setCatalogQuery } = useUiStore()
   const all = useMemo(() => sections(project), [project])
 
-  const q = catalogQuery.trim().toLowerCase()
   const visible = all
     .filter(([tab]) => catalogTab === 'all' || catalogTab === tab)
-    .map(([tab, title, rows]) => [tab, title, rows.filter((r) => !q || r.name.toLowerCase().includes(q))] as const)
+    .map(([tab, title, rows]) => [tab, title, rows.filter((r) => matchesQuery(r.name, catalogQuery))] as const)
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-panel">
@@ -119,15 +120,7 @@ export function CatalogPanel() {
         </div>
       </div>
       <div className="flex flex-col gap-2 px-3 pt-3 pb-2">
-        <label className="flex h-[30px] items-center gap-2 rounded-md border border-line2 bg-sunken px-2.5 text-tx3 focus-within:border-ac">
-          <Search size={13} />
-          <input
-            value={catalogQuery}
-            onChange={(e) => setCatalogQuery(e.target.value)}
-            placeholder="Cerca per nome"
-            className="min-w-0 flex-1 bg-transparent text-tx outline-none placeholder:text-tx3"
-          />
-        </label>
+        <SearchInput value={catalogQuery} onChange={setCatalogQuery} placeholder="Cerca per nome" />
         <div className="flex rounded-[7px] border border-line bg-sunken p-0.5 text-xs text-tx2">
           {TABS.map(([tab, label]) => (
             <button

@@ -1,7 +1,9 @@
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, Plus, Search } from 'lucide-react'
+import { ChevronDown, Plus } from 'lucide-react'
+import { matchesAny } from '@shared/engine'
 import { cn } from './primitives'
+import { SearchInput } from './SearchInput'
 
 export interface ComboOption {
   id: string
@@ -43,8 +45,7 @@ export function Combobox({
   const selected = options.find((o) => o.id === value)
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return q ? options.filter((o) => o.label.toLowerCase().includes(q) || o.sub?.toLowerCase().includes(q)) : options
+    return query.trim() ? options.filter((o) => matchesAny(query, o.label, o.sub)) : options
   }, [options, query])
 
   useLayoutEffect(() => {
@@ -94,16 +95,15 @@ export function Combobox({
               style={{ left: Math.min(rect.left, window.innerWidth - width - 8), width, ...(below ? { top: rect.bottom + 4 } : { bottom: window.innerHeight - rect.top + 4 }) }}
               onMouseDown={(e) => e.stopPropagation()}
             >
-              <label className="mb-1 flex h-[30px] flex-none items-center gap-2 rounded-md border border-line2 bg-sunken px-2.5">
-                <Search size={13} className="text-tx3" />
-                <input
-                  autoFocus
-                  value={query}
-                  onChange={(e) => {
-                    setQuery(e.target.value)
-                    setActive(0)
-                  }}
-                  onKeyDown={(e) => {
+              <SearchInput
+                className="mb-1 flex-none"
+                autoFocus
+                value={query}
+                onChange={(v) => {
+                  setQuery(v)
+                  setActive(0)
+                }}
+                onKeyDown={(e) => {
                     if (e.key === 'ArrowDown') setActive((a) => Math.min(a + 1, filtered.length - 1))
                     if (e.key === 'ArrowUp') setActive((a) => Math.max(a - 1, 0))
                     if (e.key === 'Enter') {
@@ -117,10 +117,7 @@ export function Combobox({
                       close()
                     }
                   }}
-                  placeholder="Cerca…"
-                  className="min-w-0 flex-1 bg-transparent text-tx outline-none placeholder:text-tx3"
-                />
-              </label>
+              />
               <div className="min-h-0 flex-1 overflow-y-auto">
                 {allowClear && (
                   <button type="button" onClick={() => pick(null)} className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-tx3 hover:bg-hover">

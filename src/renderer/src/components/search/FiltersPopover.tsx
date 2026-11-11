@@ -6,6 +6,7 @@ import { useUiStore } from '../../store/ui'
 import { Combobox } from '../ui/Combobox'
 import { Button, Segmented, Select, TextInput, Toggle, useClickOutside } from '../ui/form'
 import { IconButton, TAG_META, ToolbarButton, cn } from '../ui/primitives'
+import { SearchInput } from '../ui/SearchInput'
 import { filterScenes, filtersActive, useFilterStore } from './search'
 
 const ENTITY_TYPES = [
@@ -21,7 +22,8 @@ const ENTITY_TYPES = [
 export function FiltersPopover() {
   const p = useProject()
   const ui = useUiStore()
-  const { filters, setFilters, reset, saved, save, remove } = useFilterStore()
+  const { filters, setFilters, reset, save, remove } = useFilterStore()
+  const saved = useUiStore((s) => s.savedFilters)
   const [open, setOpen] = useState(false)
   const [viewName, setViewName] = useState('')
   const [entityType, setEntityType] = useState<(typeof ENTITY_TYPES)[number][0]>('npc')
@@ -101,7 +103,7 @@ export function FiltersPopover() {
             </div>
             <div className="flex flex-col gap-1.5">
               <span className="text-[11.5px] text-tx3">Testo</span>
-              <TextInput value={filters.text} placeholder="Titolo o descrizione" onCommit={(text) => setFilters({ text })} />
+              <SearchInput value={filters.text} placeholder="Titolo o descrizione" onChange={(text) => setFilters({ text })} />
             </div>
           </div>
           <div className="flex flex-col gap-1.5">

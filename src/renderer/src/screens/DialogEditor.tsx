@@ -19,7 +19,7 @@ import {
   type OnSelectionChangeParams
 } from '@xyflow/react'
 import { ArrowLeft, CircleAlert, CircleCheck, Dices, Lock, MessageSquare, Minus, Play, Plus, Scan, Square, Zap } from 'lucide-react'
-import { newId, type Dialog, type DialogChoice, type DialogLine } from '@shared/model'
+import { makeDialogChoice, makeDialogLine, newId, type Dialog, type DialogChoice, type DialogLine } from '@shared/model'
 import { stepsSatisfiedBy } from '@shared/engine'
 import { EntityChip } from '../components/logic/EntityChip'
 import { EffectList, SkillCheckEditor } from '../components/logic/EffectEditor'
@@ -27,9 +27,9 @@ import { GateButton, newCheck } from '../components/logic/GateButton'
 import { UsageList, useUsage } from '../components/logic/UsageList'
 import { confirmDialog } from '../components/ui/ConfirmDialog'
 import { Field, Select, TextArea, TextInput, Toggle } from '../components/ui/form'
-import { DangerButton, IconButton, Kbd, ToolbarButton, cn } from '../components/ui/primitives'
+import { DangerButton, IconButton, ToolbarButton, cn } from '../components/ui/primitives'
 import { Section } from '../components/ui/Sheet'
-import { apply, emptyGate, useProject } from '../lib/entities'
+import { apply, useProject } from '../lib/entities'
 import { useKbd } from '../lib/commands'
 import { usePanCursor } from '../lib/cursors'
 import { useCommand } from '../lib/shortcuts'
@@ -331,9 +331,9 @@ function Detail({ dialog, sel, setSel }: { dialog: Dialog; sel: Sel; setSel(s: S
             type="button"
             className="text-[11.5px] text-tx2 hover:text-tx"
             onClick={() => {
-              const id = newId('dialogChoice')
-              updateDialog(dialog.id, 'Nuova scelta', (d) => void d.lines[li]!.choices.push({ id, text: '', targetLineId: null, gate: emptyGate(), effects: [], check: null }))
-              setSel({ kind: 'choice', lineId: line.id, id })
+              const choice = makeDialogChoice()
+              updateDialog(dialog.id, 'Nuova scelta', (d) => void d.lines[li]!.choices.push(choice))
+              setSel({ kind: 'choice', lineId: line.id, id: choice.id })
             }}
           >
             + Scelta
@@ -412,7 +412,7 @@ function DialogCanvas({ dialog, sel, setSel }: { dialog: Dialog; sel: Sel; setSe
       updateDialog(dialog.id, 'Collega', (d) => {
         if (fromLine) {
           // Da battuta a battuta: nuova scelta che porta lì.
-          d.lines.find((l) => l.id === fromLine.id)!.choices.push({ id: newId('dialogChoice'), text: '', targetLineId: target, gate: emptyGate(), effects: [], check: null })
+          d.lines.find((l) => l.id === fromLine.id)!.choices.push(makeDialogChoice(target))
           return
         }
         for (const l of d.lines) {
@@ -494,20 +494,20 @@ export function DialogEditor({ dialogId }: { dialogId: string }) {
   const selectedLine = sel ? (sel.kind === 'line' ? sel.id : sel.lineId) : null
 
   const addLine = () => {
-    const id = newId('dialogLine')
     const base = dialog.lines.find((l) => l.id === selectedLine)?.position ?? { x: 0, y: 0 }
+    const line = makeDialogLine({ x: base.x + CHOICE_DX * 2, y: base.y + 40 })
     updateDialog(dialog.id, 'Nuova battuta', (d) => {
-      d.lines.push({ id, speaker: { kind: 'npc' }, text: '', effects: [], choices: [], position: { x: base.x + CHOICE_DX * 2, y: base.y + 40 } })
-      if (!d.startLineId) d.startLineId = id
+      d.lines.push(line)
+      if (!d.startLineId) d.startLineId = line.id
     })
-    setSel({ kind: 'line', id })
+    setSel({ kind: 'line', id: line.id })
   }
   const addChoice = () => {
     const line = dialog.lines.find((l) => l.id === selectedLine)
     if (!line) return
-    const id = newId('dialogChoice')
-    updateDialog(dialog.id, 'Nuova scelta', (d) => void d.lines.find((l) => l.id === line.id)!.choices.push({ id, text: '', targetLineId: null, gate: emptyGate(), effects: [], check: null }))
-    setSel({ kind: 'choice', lineId: line.id, id })
+    const choice = makeDialogChoice()
+    updateDialog(dialog.id, 'Nuova scelta', (d) => void d.lines.find((l) => l.id === line.id)!.choices.push(choice))
+    setSel({ kind: 'choice', lineId: line.id, id: choice.id })
   }
 
   return (

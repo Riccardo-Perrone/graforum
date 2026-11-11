@@ -1,53 +1,69 @@
-import { useMemo, useState } from 'react'
-import { CircleAlert, Info, OctagonX, RefreshCw, Wrench } from 'lucide-react'
-import { newId } from '@shared/model'
-import { validate, type Issue, type Severity } from '@shared/engine'
+import { useState } from 'react'
+import { CircleAlert, Info, OctagonX, Wrench } from 'lucide-react'
+import { makeEncounter, makeEnding } from '@shared/model'
+import { groupDescendants, validateCached, type Issue, type Severity } from '@shared/engine'
 import { dockBridge } from '../../dock/bridge'
 import { apply, useProject } from '../../lib/entities'
+import { deleteEncounters } from '../../lib/sceneOps'
+import { useKbd } from '../../lib/commands'
 import { openEntity, useUiStore } from '../../store/ui'
 import { Segmented } from '../ui/form'
-import { IconButton, cn } from '../ui/primitives'
+import { cn } from '../ui/primitives'
 import { SheetHeader } from '../ui/Sheet'
 
 const ICON = { error: OctagonX, warning: CircleAlert, note: Info }
 const COLOR = { error: 'text-err', warning: 'text-warn', note: 'text-tx3' }
 
-/** Correzione rapida per i problemi più comuni. */
+/** Prima scena del gruppo o dei suoi sottogruppi, in ordine di elenco. */
+const firstSceneIn = (d: { groups: { id: string; parentId: string | null }[]; scenes: { id: string; groupId: string | null }[] }, groupId: string) => {
+  const ids = groupDescendants(d.groups, groupId)
+  return d.scenes.find((s) => s.groupId !== null && ids.has(s.groupId))
+}
+
+/** Correzione rapida (pulsante con la chiave inglese accanto al problema), scelta dal codice stabile del problema. */
 function quickFix(issue: Issue): { label: string; run(): void } | null {
   const id = issue.target.id
-  switch (issue.title) {
-    case 'Scena di partenza mancante':
+  switch (issue.code) {
+    case 'missingStart':
       return { label: 'Usa la prima scena', run: () => apply('Scena di partenza', (d) => void (d.startSceneId = d.scenes[0]?.id ?? null)) }
-    case 'Scena Warning senza incontro':
+    case 'warningWithoutEncounter':
       return {
         label: 'Aggiungi incontro',
         run: () => {
-          const encId = newId('encounter')
           apply('Nuovo incontro', (d) => {
             const s = d.scenes.find((x) => x.id === id)!
-            d.encounters.push({ id: encId, name: `Incontro in ${s.title}`, enemies: [], nature: 'unique', rewards: { xp: 0, items: [] }, outcomes: { win: { target: null, effects: [] }, flee: { target: null, effects: [] }, defeat: { target: null, effects: [] } } })
-            s.encounterIds.push(encId)
+            const encounter = makeEncounter(`Incontro in ${s.title}`)
+            d.encounters.push(encounter)
+            s.encounterIds.push(encounter.id)
           })
           openEntity('scene', id)
         }
       }
-    case 'Vicolo cieco':
+    case 'deadEnd':
       return {
         label: 'Segna come finale',
-        run: () => apply('Scena finale', (d) => void d.endings.push({ id: newId('ending'), sceneId: id, label: 'Nuovo finale', color: '#e9c64a', manualDecisive: [] }))
+        run: () => apply('Scena finale', (d) => void d.endings.push(makeEnding(id, d.endings.length)))
       }
-    case 'Gruppo senza entrata':
-      return { label: 'Prima scena come entrata', run: () => apply('Entrata gruppo', (d) => {
-        const g = d.groups.find((x) => x.id === id)!
-        const s = d.scenes.find((x) => x.groupId === g.id)
-        if (s) g.entrySceneIds.push(s.id)
-      }) }
-    case 'Gruppo senza uscita':
-      return { label: 'Prima scena come uscita', run: () => apply('Uscita gruppo', (d) => {
-        const g = d.groups.find((x) => x.id === id)!
-        const s = d.scenes.find((x) => x.groupId === g.id)
-        if (s) g.exitSceneIds.push(s.id)
-      }) }
+    case 'groupWithoutEntry':
+      return {
+        label: 'Prima scena come entrata',
+        run: () =>
+          apply('Entrata gruppo', (d) => {
+            const s = firstSceneIn(d, id)
+            if (s) d.groups.find((x) => x.id === id)!.entrySceneIds.push(s.id)
+          })
+      }
+    case 'groupWithoutExit':
+      return {
+        label: 'Prima scena come uscita',
+        run: () =>
+          apply('Uscita gruppo', (d) => {
+            const s = firstSceneIn(d, id)
+            if (s) d.groups.find((x) => x.id === id)!.exitSceneIds.push(s.id)
+          })
+      }
+    case 'encounterWithoutScene':
+      return { label: 'Elimina incontro', run: () => void deleteEncounters([id]) }
     default:
       return null
   }
@@ -59,8 +75,9 @@ export function ValidationPanel() {
   const ui = useUiStore()
   const [filter, setFilter] = useState<'all' | Severity>('all')
   const [selected, setSelected] = useState<string | null>(null)
-  const [nonce, setNonce] = useState(0)
-  const issues = useMemo(() => validate(p), [p, nonce])
+  // Ricalcolata a ogni modifica del progetto (stesso risultato di barra di stato, toolbar e grafo).
+  const issues = validateCached(p)
+  const kbdToggle = useKbd('toggleValidation')
   const count = (s: Severity) => issues.filter((i) => i.severity === s).length
   const shown = issues.filter((i) => filter === 'all' || i.severity === filter)
   const groups: [Severity, string][] = [
@@ -82,7 +99,6 @@ export function ValidationPanel() {
       <SheetHeader
         category="Validazione"
         title={`${issues.length} problemi in ${p.scenes.length} scene`}
-        actions={<IconButton icon={RefreshCw} size={13} title="Ricalcola" onClick={() => setNonce(nonce + 1)} />}
         onClose={() => (dockBridge.closePanel?.('validation'), ui.setHighlight(null))}
       />
       <div className="border-b border-line p-3">
@@ -137,7 +153,7 @@ export function ValidationPanel() {
           )
         })}
       </div>
-      <div className="border-t border-line px-4 py-2 font-mono text-[11px] text-tx3">Ricalcolata a ogni modifica · Ctrl Maiusc M</div>
+      <div className="border-t border-line px-4 py-2 font-mono text-[11px] text-tx3">Ricalcolata a ogni modifica{kbdToggle ? ` · ${kbdToggle}` : ''}</div>
     </div>
   )
 }

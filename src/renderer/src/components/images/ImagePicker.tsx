@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react'
-import { Check, ImagePlus, Search, Trash2, Upload } from 'lucide-react'
+import { Check, ImagePlus, Trash2, Upload } from 'lucide-react'
 import { imageUrl } from '@shared/ipc'
 import { buildUsageIndex } from '@shared/model'
+import { matchesAny } from '@shared/engine'
 import { apply, useProject } from '../../lib/entities'
 import { BlockedDeleteDialog } from '../logic/UsageList'
 import { Button, TextInput } from '../ui/form'
 import { Sheet } from '../ui/Sheet'
 import { cn } from '../ui/primitives'
+import { SearchInput } from '../ui/SearchInput'
 
 /** Miniatura di un'immagine della libreria, con segnaposto a righe se manca. */
 export function ImageThumb({ id, className, rounded = 'rounded-lg', label }: { id: string | null; className?: string; rounded?: string; label?: string }) {
@@ -37,8 +39,7 @@ export function ImagePicker({ value, onPick, onClose }: { value?: string | null;
   const [query, setQuery] = useState('')
   const [blocked, setBlocked] = useState(false)
   const tags = useMemo(() => [...new Set(p.images.flatMap((i) => i.tags))].sort(), [p.images])
-  const q = query.trim().toLowerCase()
-  const shown = p.images.filter((i) => (!tag || i.tags.includes(tag)) && (!q || `${i.title} ${i.fileName} ${i.tags.join(' ')}`.toLowerCase().includes(q)))
+  const shown = p.images.filter((i) => (!tag || i.tags.includes(tag)) && matchesAny(query, i.title, i.fileName, ...i.tags))
   const current = p.images.find((i) => i.id === selected)
   const usage = current ? (buildUsageIndex(p).get(current.id) ?? []) : []
 
@@ -75,10 +76,7 @@ export function ImagePicker({ value, onPick, onClose }: { value?: string | null;
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-center gap-2 border-b border-line p-3">
-          <label className="flex h-[30px] flex-1 items-center gap-2 rounded-md border border-line2 bg-sunken px-2.5 text-tx3 focus-within:border-ac">
-            <Search size={13} />
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Cerca per nome o tag" className="flex-1 bg-transparent text-tx outline-none" />
-          </label>
+          <SearchInput className="flex-1" value={query} onChange={setQuery} placeholder="Cerca per nome o tag" />
           <Button onClick={upload}>
             <Upload size={14} />
             Carica

@@ -23,6 +23,10 @@ export function TitleBar() {
   const toggleTheme = useUiStore((s) => s.toggleTheme)
   const fileName = filePath?.split(/[\\/]/).pop()
   const kbdLayout = useKbd('resetLayout')
+  const kbdUndo = useKbd('undo')
+  const kbdRedo = useKbd('redo')
+  const kbdTheme = useKbd('toggleTheme')
+  const withKbd = (label: string, kbd: string) => (kbd ? `${label} (${kbd})` : label)
 
   return (
     <header
@@ -33,8 +37,8 @@ export function TitleBar() {
       <MenuBar />
       {project && (
         <div className="no-drag flex gap-0.5">
-          <IconButton icon={Undo2} title="Annulla (Ctrl+Z)" disabled={!canUndo} onClick={undo} />
-          <IconButton icon={Redo2} title="Ripeti (Ctrl+Y)" disabled={!canRedo} onClick={redo} />
+          <IconButton icon={Undo2} title={withKbd('Annulla', kbdUndo)} disabled={!canUndo} onClick={undo} />
+          <IconButton icon={Redo2} title={withKbd('Ripeti', kbdRedo)} disabled={!canRedo} onClick={redo} />
         </div>
       )}
       <div className="flex flex-1 items-center justify-center gap-2 text-[12.5px]">
@@ -55,14 +59,14 @@ export function TitleBar() {
         <IconButton
           className="no-drag"
           icon={LayoutDashboard}
-          title={`Layout standard${kbdLayout ? ` (${kbdLayout})` : ''}`}
+          title={withKbd('Layout standard', kbdLayout)}
           onClick={() => dockBridge.resetLayout?.()}
         />
       )}
       <IconButton
         className="no-drag"
         icon={theme === 'dark' ? Moon : Sun}
-        title="Cambia tema (Ctrl+Maiusc+T)"
+        title={withKbd('Cambia tema', kbdTheme)}
         onClick={toggleTheme}
       />
     </header>

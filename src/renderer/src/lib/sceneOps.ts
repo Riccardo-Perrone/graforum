@@ -1,35 +1,25 @@
 import type { Draft } from 'immer'
-import { newId, type Owner, type Project, type Scene } from '@shared/model'
+import { makeGroup, makeScene, newId, type Group, type Owner, type Project, type Scene } from '@shared/model'
+import { encounterBlockers, encountersOrphanedBy, entityName, groupDescendants, planGrouping, pruneGroupEnds } from '@shared/engine'
 import { sceneBlockers } from '../components/logic/UsageList'
 import { confirmDialog } from '../components/ui/ConfirmDialog'
 import { useUiStore } from '../store/ui'
-import { apply, emptyGate, getProject } from './entities'
+import { apply, getProject } from './entities'
 
 // Operazioni su scene e gruppi condivise da toolbar, menu contestuale e schede.
 
+/** Nuova scena con l'angolo in alto a sinistra in `position`; diventa la selezione. */
 export function createScene(position: { x: number; y: number }, groupId: string | null = null): string {
-  const id = newId('scene')
-  const scene: Scene = {
-    id,
-    title: 'Nuova scena',
-    description: '',
-    imageId: null,
-    tag: 'neutral',
-    tagHidden: false,
-    labelIds: [],
-    cover: null,
-    groupId,
-    npcs: [],
-    items: [],
-    encounterIds: [],
-    access: emptyGate(),
-    entryEffects: [],
-    entryCheck: null,
-    position: { x: Math.round(position.x), y: Math.round(position.y) }
-  }
+  const scene = makeScene(position, { groupId })
   apply('Nuova scena', (d) => void d.scenes.push(scene))
-  useUiStore.getState().setSelection([id])
-  return id
+  useUiStore.getState().setSelection([scene.id])
+  return scene.id
+}
+
+/** Toglie le scene dalle entrate e dalle uscite del gruppo. */
+function dropFromGroupEnds(g: Group, sceneIds: ReadonlySet<string>): void {
+  g.entrySceneIds = g.entrySceneIds.filter((x) => !sceneIds.has(x))
+  g.exitSceneIds = g.exitSceneIds.filter((x) => !sceneIds.has(x))
 }
 
 /** Elimina la scena con i suoi collegamenti; se è usata altrove restituisce chi la usa e non fa nulla. */
@@ -37,20 +27,41 @@ export async function deleteScene(id: string): Promise<Owner[] | null> {
   return (await deleteScenes([id]))?.owners ?? null
 }
 
-/** Elimina più scene con una sola conferma; se una è usata altrove non fa nulla e restituisce chi la usa. */
+/** Chi impedisce di eliminare gli incontri che resterebbero senza scena, come elenco "Usato in" da mostrare. */
+function blockedEncounters(p: Project, orphans: string[], goingAway: ReadonlySet<string>): { name: string; owners: Owner[] } | null {
+  const owners = encounterBlockers(p, orphans, goingAway)
+  if (!owners.length) return null
+  return { name: encounterList(p, orphans), owners }
+}
+
+const encounterList = (p: Project, ids: string[]) => ids.map((id) => entityName(p, 'encounter', id)).join(', ')
+
+/**
+ * Elimina più scene con una sola conferma, insieme ai loro collegamenti e agli incontri che non stanno in altre scene.
+ * Se qualcosa che resta nel progetto usa una di queste scene o di questi incontri non fa nulla e restituisce chi la usa.
+ */
 export async function deleteScenes(ids: string[]): Promise<{ name: string; owners: Owner[] } | null> {
   const p = getProject()
   const scenes = p.scenes.filter((s) => ids.includes(s.id))
   if (!scenes.length) return null
+  const gone = new Set(scenes.map((s) => s.id))
+  const links = p.links.filter((l) => gone.has(l.fromSceneId) || gone.has(l.toSceneId))
+  const orphans = encountersOrphanedBy(p, { deletedSceneIds: gone })
+  // Ciò che sparisce insieme alle scene non le blocca (es. due scene eliminate insieme che si citano, o un loro incontro).
+  const goingAway = new Set([...gone, ...links.map((l) => l.id), ...orphans])
   for (const scene of scenes) {
-    const owners = sceneBlockers(scene.id)
+    const owners = sceneBlockers(scene.id).filter((o) => !goingAway.has(o.id))
     if (owners.length) return { name: scene.title, owners }
   }
-  const gone = new Set(scenes.map((s) => s.id))
-  const links = p.links.filter((l) => gone.has(l.fromSceneId) || gone.has(l.toSceneId)).length
+  const blocked = blockedEncounters(p, orphans, goingAway)
+  if (blocked) return blocked
+  const detail = [
+    links.length ? `Verranno eliminati anche ${links.length} collegamenti.` : '',
+    orphans.length ? `${orphans.length === 1 ? 'Verrà eliminato anche l’incontro' : 'Verranno eliminati anche gli incontri'} ${encounterList(p, orphans)}.` : ''
+  ].filter(Boolean)
   const ok = await confirmDialog({
     title: scenes.length === 1 ? `Eliminare la scena «${scenes[0]!.title}»?` : `Eliminare ${scenes.length} scene?`,
-    detail: links ? `Verranno eliminati anche ${links} collegamenti.` : undefined,
+    detail: detail.length ? detail.join('\n') : undefined,
     confirmLabel: scenes.length === 1 ? 'Elimina scena' : 'Elimina scene',
     confirmCommand: 'deleteSelection'
   })
@@ -58,16 +69,54 @@ export async function deleteScenes(ids: string[]): Promise<{ name: string; owner
   const ui = useUiStore.getState()
   if (ui.sheet?.kind === 'scene' && gone.has(ui.sheet.id)) ui.openSheet(null)
   ui.setSelection([])
+  const dropEncounters = new Set(orphans)
   apply(scenes.length === 1 ? 'Elimina scena' : 'Elimina scene', (d) => {
     d.scenes = d.scenes.filter((s) => !gone.has(s.id))
     d.links = d.links.filter((l) => !gone.has(l.fromSceneId) && !gone.has(l.toSceneId))
     d.endings = d.endings.filter((e) => !gone.has(e.sceneId))
-    for (const g of d.groups) {
-      g.entrySceneIds = g.entrySceneIds.filter((x) => !gone.has(x))
-      g.exitSceneIds = g.exitSceneIds.filter((x) => !gone.has(x))
-    }
+    d.encounters = d.encounters.filter((e) => !dropEncounters.has(e.id))
+    for (const g of d.groups) dropFromGroupEnds(g, gone)
   })
   return null
+}
+
+/** Toglie un incontro dalla scena; se non è in altre scene lo elimina dal progetto (dopo conferma, o bloccato se usato altrove). */
+export async function detachEncounter(sceneId: string, encounterId: string): Promise<void> {
+  const p = getProject()
+  const orphans = encountersOrphanedBy(p, { detached: { sceneId, encounterId } })
+  if (orphans.length) {
+    const blocked = blockedEncounters(p, orphans, new Set([sceneId]))
+    if (blocked) return useUiStore.getState().showBlocked(blocked)
+    const ok = await confirmDialog({
+      title: `Togliere l’incontro «${entityName(p, 'encounter', encounterId)}»?`,
+      detail: 'Non è in nessun’altra scena: verrà eliminato dal progetto.',
+      confirmLabel: 'Elimina incontro'
+    })
+    if (!ok) return
+  }
+  apply(orphans.length ? 'Elimina incontro' : 'Rimuovi incontro', (d) => {
+    const s = d.scenes.find((x) => x.id === sceneId)
+    if (s) s.encounterIds = s.encounterIds.filter((x) => x !== encounterId)
+    if (orphans.length) d.encounters = d.encounters.filter((e) => e.id !== encounterId)
+  })
+}
+
+/** Elimina incontri che non stanno in nessuna scena (correzione rapida della validazione). */
+export async function deleteEncounters(ids: string[]): Promise<void> {
+  const p = getProject()
+  const blocked = blockedEncounters(p, ids, new Set())
+  if (blocked) return useUiStore.getState().showBlocked(blocked)
+  const ok = await confirmDialog({
+    title: ids.length === 1 ? `Eliminare l’incontro «${entityName(p, 'encounter', ids[0]!)}»?` : `Eliminare ${ids.length} incontri?`,
+    detail: ids.length > 1 ? encounterList(p, ids) : undefined,
+    confirmLabel: ids.length === 1 ? 'Elimina incontro' : 'Elimina incontri'
+  })
+  if (!ok) return
+  const gone = new Set(ids)
+  apply(ids.length === 1 ? 'Elimina incontro' : 'Elimina incontri', (d) => {
+    d.encounters = d.encounters.filter((e) => !gone.has(e.id))
+    for (const s of d.scenes) s.encounterIds = s.encounterIds.filter((x) => !gone.has(x))
+  })
 }
 
 /** Elimina collegamenti dopo conferma. */
@@ -87,17 +136,6 @@ export async function deleteLinks(ids: string[]): Promise<void> {
   apply(links.length === 1 ? 'Elimina collegamento' : 'Elimina collegamenti', (d) => void (d.links = d.links.filter((l) => !gone.has(l.id))))
 }
 
-/**
- * Il collegamento tra due scene è unico: A→B, oppure A↔B, oppure A→B insieme a B→A.
- * Vero se si può aggiungere (o, con `ignoreId`, modificare) un collegamento da→a.
- */
-export function canLink(p: Pick<Project, 'links'>, from: string, to: string, bidirectional = false, ignoreId?: string): boolean {
-  if (from === to) return false
-  const between = p.links.filter((l) => l.id !== ignoreId && ((l.fromSceneId === from && l.toSceneId === to) || (l.fromSceneId === to && l.toSceneId === from)))
-  if (bidirectional) return between.length === 0
-  return !between.some((l) => l.bidirectional || (l.fromSceneId === from && l.toSceneId === to))
-}
-
 export function duplicateScene(id: string): void {
   const p = getProject()
   const s = p.scenes.find((x) => x.id === id)
@@ -112,19 +150,41 @@ export function duplicateScene(id: string): void {
   useUiStore.getState().setSelection([copy.id])
 }
 
-/** Nuovo gruppo con le scene selezionate (annidato nel gruppo comune, se c'è). */
+/**
+ * "Raggruppa la selezione": i gruppi selezionati per intero (tutte le loro scene, o la carta se collassati) restano gruppi e
+ * diventano sottogruppi del nuovo; le altre scene entrano direttamente. Il nuovo gruppo nasce nell'antenato comune più vicino.
+ */
 export function groupSelection(): string | null {
   const p = getProject()
-  const ids = useUiStore.getState().selectedSceneIds
-  const scenes = p.scenes.filter((s) => ids.includes(s.id))
-  const parents = new Set(scenes.map((s) => s.groupId))
-  const parentId = parents.size === 1 ? [...parents][0]! : null
-  const id = newId('group')
+  const { selectedSceneIds, selectedCardIds } = useUiStore.getState()
+  const plan = planGrouping(p, selectedSceneIds, selectedCardIds)
+  if (!plan.groupIds.length && !plan.sceneIds.length) return null
+  const group = makeGroup('Nuovo gruppo', plan.parentId)
+  // Entrata: la prima scena (in ordine di progetto) tra quelle sciolte e quelle dei gruppi interi.
+  const inside = new Set(plan.groupIds.flatMap((id) => [...groupDescendants(p.groups, id)]))
+  const entry = p.scenes.find((s) => plan.sceneIds.includes(s.id) || (s.groupId !== null && inside.has(s.groupId)))
+  group.entrySceneIds = entry ? [entry.id] : []
   apply('Nuovo gruppo', (d) => {
-    d.groups.push({ id, name: 'Nuovo gruppo', description: '', parentId, entrySceneIds: scenes[0] ? [scenes[0].id] : [], exitSceneIds: [], color: null, collapsed: false })
-    for (const s of d.scenes) if (ids.includes(s.id)) s.groupId = id
+    d.groups.push(group)
+    moveIntoGroup(d, group.id, plan)
   })
-  return id
+  return group.id
+}
+
+/** Selezione da raggruppare: scene o carte di gruppi collassati. */
+export const canGroupSelection = (): boolean => {
+  const ui = useUiStore.getState()
+  return ui.selectedSceneIds.length > 0 || ui.selectedCardIds.length > 0
+}
+
+/**
+ * Dentro una modifica già aperta: i gruppi diventano sottogruppi di `targetId` (con tutto il loro contenuto), le scene
+ * entrano direttamente; poi entrate e uscite rimaste fuori dai loro gruppi si tolgono.
+ */
+export function moveIntoGroup(d: Draft<Project>, targetId: string, plan: { groupIds: readonly string[]; sceneIds: readonly string[] }): void {
+  for (const g of d.groups) if (plan.groupIds.includes(g.id)) g.parentId = targetId
+  assignToGroup(d, [...plan.sceneIds], targetId)
+  pruneGroupEnds(d)
 }
 
 /** Scioglie il gruppo: scene e sottogruppi passano al gruppo padre. */
@@ -146,10 +206,7 @@ export function removeFromGroup(sceneIds: string[]): void {
     for (const s of d.scenes) {
       if (!sceneIds.includes(s.id) || !s.groupId) continue
       const g = d.groups.find((x) => x.id === s.groupId)
-      if (g) {
-        g.entrySceneIds = g.entrySceneIds.filter((x) => x !== s.id)
-        g.exitSceneIds = g.exitSceneIds.filter((x) => x !== s.id)
-      }
+      if (g) dropFromGroupEnds(g, new Set([s.id]))
       s.groupId = g?.parentId ?? null
     }
   })
@@ -176,24 +233,7 @@ export function assignToGroup(d: Draft<Project>, sceneIds: string[], groupId: st
   for (const s of d.scenes) {
     if (!sceneIds.includes(s.id) || s.groupId === groupId) continue
     const old = d.groups.find((x) => x.id === s.groupId)
-    if (old) {
-      old.entrySceneIds = old.entrySceneIds.filter((x) => x !== s.id)
-      old.exitSceneIds = old.exitSceneIds.filter((x) => x !== s.id)
-    }
+    if (old) dropFromGroupEnds(old, new Set([s.id]))
     s.groupId = groupId
   }
-}
-
-/** Sposta un gruppo intero: tutte le scene dei suoi livelli interni traslano dello stesso scostamento. */
-export function moveGroup(groupId: string, dx: number, dy: number): void {
-  if (dx === 0 && dy === 0) return
-  apply('Sposta gruppo', (d) => {
-    const ids = new Set([groupId])
-    let added = true
-    while (added) {
-      added = false
-      for (const g of d.groups) if (g.parentId && ids.has(g.parentId) && !ids.has(g.id)) (ids.add(g.id), (added = true))
-    }
-    for (const s of d.scenes) if (s.groupId && ids.has(s.groupId)) s.position = { x: s.position.x + dx, y: s.position.y + dy }
-  })
 }

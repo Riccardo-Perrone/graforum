@@ -1,6 +1,7 @@
 import type { EntityType } from '../model/ids'
 import type { Condition, Effect, QuestState, SkillCheck } from '../model/logic'
 import type { Project } from '../model/project'
+import { allChecks } from './refs'
 
 // Nomi leggibili delle entità e frasi "in parole" per condizioni ed effetti.
 
@@ -114,12 +115,7 @@ export function describeCondition(p: Project, c: Condition | null): string {
 }
 
 export function checkName(p: Project, checkId: string): string {
-  const all = [
-    ...p.links.flatMap((l) => l.checks),
-    ...p.scenes.flatMap((s) => [...s.items.flatMap((i) => i.checks), ...(s.entryCheck ? [s.entryCheck] : [])]),
-    ...p.dialogs.flatMap((d) => d.lines.flatMap((l) => l.choices.flatMap((c) => (c.check ? [c.check] : []))))
-  ]
-  const c = all.find((x) => x.id === checkId)
+  const c = allChecks(p).find((x) => x.id === checkId)
   return c ? describeCheck(p, c) : '(prova eliminata)'
 }
 

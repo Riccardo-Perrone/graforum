@@ -1,6 +1,7 @@
 import { create } from 'zustand'
+import { useUiStore } from '../../store/ui'
 import { buildUsageIndex, type EntityType, type Project, type SceneTag } from '@shared/model'
-import { validate } from '@shared/engine'
+import { groupDescendants, matchIndex, matchesAny, matchesQuery, scenesWithDialog, validateCached } from '@shared/engine'
 
 // Ricerca globale e filtri combinabili: entrambi attenuano (o nascondono) le scene escluse, senza spostarle.
 
@@ -15,27 +16,28 @@ export interface SearchResult {
 }
 
 function snippet(text: string, q: string): string | undefined {
-  const i = text.toLowerCase().indexOf(q)
+  const i = matchIndex(text, q)
   if (i < 0) return undefined
   const start = Math.max(0, i - 24)
   return `${start > 0 ? '…' : ''}${text.slice(start, i + q.length + 32)}${i + q.length + 32 < text.length ? '…' : ''}`
 }
 
 export function search(p: Project, query: string): SearchResult[] {
-  const q = query.trim().toLowerCase()
+  const q = query.trim()
   if (!q) return []
   const usage = buildUsageIndex(p)
   const scenesOf = (id: string) =>
     (usage.get(id) ?? []).flatMap((o) => (o.type === 'scene' ? [o.id] : o.type === 'link' ? [p.links.find((l) => l.id === o.id)!.fromSceneId] : []))
   const out: SearchResult[] = []
   for (const s of p.scenes) {
-    const inTitle = s.title.toLowerCase().includes(q)
+    const inTitle = matchesQuery(s.title, q)
     const sn = inTitle ? undefined : snippet(s.description, q)
     if (inTitle || sn) out.push({ type: 'scene', id: s.id, label: s.title, sub: inTitle ? 'titolo' : 'descrizione', sceneIds: [s.id], snippet: sn })
   }
   const cat = (type: EntityType, id: string, label: string, sub: string, extra = '') => {
-    const sn = label.toLowerCase().includes(q) ? undefined : snippet(extra, q)
-    if (label.toLowerCase().includes(q) || sn) out.push({ type, id, label, sub, sceneIds: scenesOf(id), snippet: sn })
+    const inLabel = matchesQuery(label, q)
+    const sn = inLabel ? undefined : snippet(extra, q)
+    if (inLabel || sn) out.push({ type, id, label, sub, sceneIds: scenesOf(id), snippet: sn })
   }
   p.npcs.forEach((n) => cat('npc', n.id, n.name, `NPC · ${n.role || '—'}`, `${n.description} ${n.background}`))
   p.enemies.forEach((n) => cat('enemy', n.id, n.name, `Enemy · ${n.level || '—'}`, n.description))
@@ -66,16 +68,9 @@ export const filtersActive = (f: Filters) =>
 
 export function filterScenes(p: Project, f: Filters): Set<string> {
   const usage = buildUsageIndex(p)
-  const problems = f.withProblems ? new Set(validate(p).filter((i) => i.severity !== 'note' && i.sceneId).map((i) => i.sceneId!)) : null
+  const problems = f.withProblems ? new Set(validateCached(p).filter((i) => i.severity !== 'note' && i.sceneId).map((i) => i.sceneId!)) : null
   const endings = new Set(p.endings.map((e) => e.sceneId))
-  const groupIds = new Set<string>()
-  if (f.groupId) {
-    groupIds.add(f.groupId)
-    for (let added = true; added; ) {
-      added = false
-      for (const g of p.groups) if (g.parentId && groupIds.has(g.parentId) && !groupIds.has(g.id)) (groupIds.add(g.id), (added = true))
-    }
-  }
+  const groupIds = f.groupId ? groupDescendants(p.groups, f.groupId) : new Set<string>()
   const entityScenes = f.entity
     ? new Set(
         (usage.get(f.entity.id) ?? []).flatMap((o) =>
@@ -84,14 +79,13 @@ export function filterScenes(p: Project, f: Filters): Set<string> {
             : o.type === 'link'
               ? [p.links.find((l) => l.id === o.id)!.fromSceneId]
               : o.type === 'dialog'
-                ? p.scenes.filter((s) => s.npcs.some((n) => n.dialogs.some((d) => d.dialogId === o.id))).map((s) => s.id)
+                ? scenesWithDialog(p, o.id).map((s) => s.id)
                 : o.type === 'encounter'
                   ? p.scenes.filter((s) => s.encounterIds.includes(o.id)).map((s) => s.id)
                   : []
         )
       )
     : null
-  const t = f.text.trim().toLowerCase()
   const ids = new Set<string>()
   for (const s of p.scenes) {
     if (f.tags.length && !f.tags.includes(s.tag)) continue
@@ -101,50 +95,34 @@ export function filterScenes(p: Project, f: Filters): Set<string> {
     if (f.endingsOnly && !endings.has(s.id)) continue
     if (f.groupId && !(s.groupId && groupIds.has(s.groupId))) continue
     if (entityScenes && !entityScenes.has(s.id)) continue
-    if (t && !`${s.title} ${s.description}`.toLowerCase().includes(t)) continue
+    if (!matchesAny(f.text, s.title, s.description)) continue
     ids.add(s.id)
   }
   return ids
 }
 
+/** Vista salvata dei filtri: sta nelle preferenze dell'app (`Prefs.savedFilters`). */
+export interface SavedFilterView {
+  name: string
+  filters: Filters
+}
+
 interface FilterState {
   filters: Filters
-  saved: { name: string; filters: Filters }[]
   setFilters(f: Partial<Filters>): void
   reset(): void
+  /** Salva i filtri attuali come vista con questo nome (sostituisce una vista omonima). */
   save(name: string): void
   remove(name: string): void
 }
 
-const SAVED_KEY = 'graforum.savedFilters'
+const savedViews = () => useUiStore.getState().savedFilters
+const setSavedViews = (savedFilters: SavedFilterView[]) => useUiStore.getState().setPrefs({ savedFilters })
 
 export const useFilterStore = create<FilterState>((set, get) => ({
   filters: EMPTY_FILTERS,
-  saved: (() => {
-    try {
-      return JSON.parse(localStorage.getItem(SAVED_KEY) ?? '[]') as { name: string; filters: Filters }[]
-    } catch {
-      return []
-    }
-  })(),
   setFilters: (f) => set({ filters: { ...get().filters, ...f } }),
   reset: () => set({ filters: EMPTY_FILTERS }),
-  save: (name) => {
-    const saved = [...get().saved.filter((s) => s.name !== name), { name, filters: get().filters }]
-    try {
-      localStorage.setItem(SAVED_KEY, JSON.stringify(saved))
-    } catch {
-      // viste non persistenti
-    }
-    set({ saved })
-  },
-  remove: (name) => {
-    const saved = get().saved.filter((s) => s.name !== name)
-    try {
-      localStorage.setItem(SAVED_KEY, JSON.stringify(saved))
-    } catch {
-      // viste non persistenti
-    }
-    set({ saved })
-  }
+  save: (name) => setSavedViews([...savedViews().filter((s) => s.name !== name), { name, filters: get().filters }]),
+  remove: (name) => setSavedViews(savedViews().filter((s) => s.name !== name))
 }))

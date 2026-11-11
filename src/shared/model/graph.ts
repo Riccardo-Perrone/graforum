@@ -87,11 +87,14 @@ export const Group = z.object({
 })
 export type Group = z.infer<typeof Group>
 
+/** Tavolozza dei finali (design): i finali nuovi la usano a rotazione, il primo colore è il predefinito. */
+export const ENDING_COLORS = ['#6fcf5b', '#44c4d9', '#8ea2ff', '#ad86f5', '#ef7fb8', '#e9c64a'] as const
+
 export const Ending = z.object({
   id: Id,
   sceneId: Id,
   label: z.string().default(''),
-  color: z.string().default('#6fcf5b'),
+  color: z.string().default(ENDING_COLORS[0]),
   /** Collegamenti o scelte segnati a mano come decisivi. */
   manualDecisive: z.array(z.object({ type: z.enum(['link', 'dialogChoice']), id: Id })).default([])
 })

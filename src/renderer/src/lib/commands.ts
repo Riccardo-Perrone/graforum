@@ -64,6 +64,9 @@ export function comboFor(id: CommandId, overrides: Record<string, string>): stri
   return id in overrides ? overrides[id]! : (byId.get(id)?.combo ?? '')
 }
 
+/** Ambito del comando (dove vale la sua scorciatoia). */
+export const commandScope = (id: CommandId): CommandScope => byId.get(id)?.scope ?? 'global'
+
 /** Comando che usa già la stessa combinazione in un ambito che si sovrappone. */
 export function findConflict(id: string, combo: string, overrides: Record<string, string>): CommandDef | null {
   const me = byId.get(id)

@@ -9,21 +9,19 @@ import { tags } from '@lezer/highlight'
 import { basicSetup } from 'codemirror'
 import { Marked } from 'marked'
 import { imageUrl } from '@shared/ipc'
-import { newId, type EntityType, type Project } from '@shared/model'
+import { DOC_LINK, newId, type EntityType, type Project } from '@shared/model'
 import { entityName, TYPE_NAMES } from '@shared/engine'
 import { confirmDialog } from '../components/ui/ConfirmDialog'
 import { Combobox } from '../components/ui/Combobox'
 import { Segmented, TextInput } from '../components/ui/form'
 import { IconButton, Kbd, ToolbarButton, cn } from '../components/ui/primitives'
 import { apply, useProject } from '../lib/entities'
-import { useCommand } from '../lib/shortcuts'
 import { openEntity, useUiStore } from '../store/ui'
 
 // Documenti di progetto: Markdown libero con link alle entità `@[Testo](tipo:id)`.
 // Nell'anteprima il passaggio del mouse mostra la scheda in miniatura, il clic apre l'entità.
 
-const LINK = /@\[([^\]]*)\]\((\w+):([\w-]+)\)/g
-const LINKABLE: EntityType[] = ['scene', 'npc', 'enemy', 'item', 'quest', 'dialog', 'encounter', 'group', 'flag', 'document']
+const LINK = DOC_LINK
 
 function allEntities(p: Project): { type: EntityType; id: string; label: string }[] {
   return [

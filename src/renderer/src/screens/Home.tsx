@@ -3,10 +3,13 @@ import { BookOpen, FolderOpen, Plus } from 'lucide-react'
 import { newProject, openProject, openRecent, openSample, readRecent } from '../lib/fileActions'
 import { UpdateCard } from '../components/shell/UpdateCard'
 import { Kbd } from '../components/ui/primitives'
+import { useKbd } from '../lib/commands'
 
 /** Home progetti (7c): azioni a sinistra 360px, recenti a destra. */
 export function Home() {
   const [recent] = useState(readRecent)
+  const kbdNew = useKbd('newProject')
+  const kbdOpen = useKbd('openProject')
 
   return (
     <div className="flex min-h-0 flex-1">
@@ -24,7 +27,7 @@ export function Home() {
           >
             <Plus size={14} />
             Nuovo progetto
-            <span className="ml-auto font-mono text-[10px] opacity-60">Ctrl N</span>
+            {kbdNew && <span className="ml-auto font-mono text-[10px] opacity-60">{kbdNew}</span>}
           </button>
           <button
             type="button"
@@ -33,7 +36,7 @@ export function Home() {
           >
             <FolderOpen size={14} />
             Apri…
-            <Kbd className="ml-auto">Ctrl O</Kbd>
+            {kbdOpen && <Kbd className="ml-auto">{kbdOpen}</Kbd>}
           </button>
           <button
             type="button"

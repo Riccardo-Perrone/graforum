@@ -1,5 +1,5 @@
 import { BookText, Flag, KeyRound, MessagesSquare, Package, ScrollText, Skull, Swords, UserRound, Waypoints } from 'lucide-react'
-import { Enemy, Item, Npc, Quest, newId, type EntityType, type Gate, type Project } from '@shared/model'
+import { Enemy, Flag as FlagSchema, Item, Npc, Quest, makeEncounter, newId, type EntityType, type Gate, type Project } from '@shared/model'
 import { entityName } from '@shared/engine'
 import type { ComboOption } from '../components/ui/Combobox'
 import { TAG_META } from '../components/ui/primitives'
@@ -101,22 +101,13 @@ export function createEntity(type: EntityType, name: string): string | undefined
     }
     case 'flag': {
       const id = newId('flag')
-      apply('Nuovo flag', (d) => void d.flags.push({ id, name: label.replace(/\s+/g, '_').toLowerCase(), description: '', defaultValue: false }))
+      apply('Nuovo flag', (d) => void d.flags.push(FlagSchema.parse({ id, name: label.replace(/\s+/g, '_').toLowerCase() })))
       return id
     }
     case 'encounter': {
-      const id = newId('encounter')
-      apply('Nuovo incontro', (d) =>
-        void d.encounters.push({
-          id,
-          name: label,
-          enemies: [],
-          nature: 'unique',
-          rewards: { xp: 0, items: [] },
-          outcomes: { win: { target: null, effects: [] }, flee: { target: null, effects: [] }, defeat: { target: null, effects: [] } }
-        })
-      )
-      return id
+      const encounter = makeEncounter(label)
+      apply('Nuovo incontro', (d) => void d.encounters.push(encounter))
+      return encounter.id
     }
     default:
       return undefined

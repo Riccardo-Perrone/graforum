@@ -1,4 +1,5 @@
 import type { EntityType } from '../model/ids'
+import type { SkillCheck } from '../model/logic'
 import type { Project } from '../model/project'
 
 // Riferimenti tra entità: quali campi puntano a cosa, e quali id esistono.
@@ -91,13 +92,18 @@ export const TYPE_NAMES: Record<EntityType, string> = {
   sceneLabel: 'etichetta'
 }
 
-/** Insiemi degli id esistenti per tipo. */
-export function existingIds(p: Project): Record<EntityType, Set<string>> {
-  const checks = [
+/** Tutte le prove di abilità del progetto: collegamenti, oggetti in scena, ingresso delle scene, scelte di dialogo. */
+export function allChecks(p: Project): SkillCheck[] {
+  return [
     ...p.links.flatMap((l) => l.checks),
     ...p.scenes.flatMap((s) => [...s.items.flatMap((i) => i.checks), ...(s.entryCheck ? [s.entryCheck] : [])]),
     ...p.dialogs.flatMap((d) => d.lines.flatMap((l) => l.choices.flatMap((c) => (c.check ? [c.check] : []))))
   ]
+}
+
+/** Insiemi degli id esistenti per tipo. */
+export function existingIds(p: Project): Record<EntityType, Set<string>> {
+  const checks = allChecks(p)
   return {
     project: new Set([p.id]),
     scene: new Set(p.scenes.map((x) => x.id)),

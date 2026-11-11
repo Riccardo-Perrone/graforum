@@ -12,6 +12,17 @@ export interface Transition {
 
 const sceneTarget = (o: Outcome): string | null => (o.target?.type === 'scene' ? o.target.id : null)
 
+/**
+ * Il collegamento tra due scene è unico: A→B, oppure A↔B, oppure A→B insieme a B→A.
+ * Vero se si può aggiungere (o, con `ignoreId`, modificare) un collegamento da→a.
+ */
+export function canLink(p: Pick<Project, 'links'>, from: string, to: string, bidirectional = false, ignoreId?: string): boolean {
+  if (from === to) return false
+  const between = p.links.filter((l) => l.id !== ignoreId && ((l.fromSceneId === from && l.toSceneId === to) || (l.fromSceneId === to && l.toSceneId === from)))
+  if (bidirectional) return between.length === 0
+  return !between.some((l) => l.bidirectional || (l.fromSceneId === from && l.toSceneId === to))
+}
+
 export function transitions(p: Project): Transition[] {
   const out: Transition[] = []
   for (const l of p.links) {

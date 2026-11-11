@@ -14,8 +14,8 @@ Descrive com'è fatta l'app **oggi**, per continuare a lavorarci senza rileggere
 | --- | --- |
 | `npm run dev` | App con ricarica a caldo (porta del server Vite, origine `localhost`) |
 | `npx tsc -p tsconfig.web.json --noEmit` · `npm run typecheck` | Tipi del renderer · tipi di main e renderer |
-| `npx vitest run` | Test (`src/**/*.test.ts`): modello, migrazioni, motore, export, file `.dng`, layout del dock |
-| `npm run build && npm run smoke` | Prova nell'app vera (Electron su `out/`): grafo, gruppi, dock, finestre modali, overflow a 260px |
+| `npx vitest run` | Test (`src/**/*.test.ts`, elenco in [Test](#test)): modello, motore, export, file `.dng`, scorciatoie, annulla/ripeti, grafo, ricerca, dock |
+| `npm run build && npm run smoke` | Prova nell'app vera (Electron su `out/`): grafo, gruppi, menu contestuale, dock, finestre modali, overflow a 260px |
 | `electron scripts/screenshot.cjs <cartella> <passi.json>` | Passi JS nella pagina + screenshot (`win: "popout"` fotografa una scheda staccata). Prima serve `npm run build` |
 | `npm run dist` · `npm run release` · `npm run icon` | Installer · installer + pubblicazione GitHub · rigenera `build/icon.*` |
 
@@ -33,7 +33,7 @@ src/main     Processo principale: finestra, file .dng, immagini, IPC, protocolli
 src/preload  Espone window.graforum (tipo GraforumApi in shared/ipc.ts)
 src/renderer Interfaccia React
   store/       project.ts (progetto + annulla/ripeti), ui.ts (stato UI + Prefs), updates.ts
-  lib/         commands.ts + shortcuts.ts (scorciatoie), entities.tsx, sceneOps.ts, fileActions.ts
+  lib/         commands.ts + shortcuts.ts (scorciatoie), entities.tsx, sceneOps.ts, fileActions.ts, labels.ts (colori), cursors.ts
   dock/        schede agganciabili (vedi sotto)
   components/  ui (primitive), graph, scene, catalog, logic, search, cross, validation, export, settings, shell
   screens/     Home, SheetHost, e i corpi delle schede Dialoghi, Documenti, Playtest
@@ -43,14 +43,48 @@ src/renderer Interfaccia React
 - **Logica nel posto giusto:** valutazione, validazione, indici, descrizioni stanno in `src/shared/engine` con test; la UI le richiama senza duplicarle.
 - **Il main non conosce lo stato dell'app:** tiene solo le immagini del progetto aperto (in memoria, finiscono nel `.dng` al salvataggio) e risponde agli IPC.
 
+### Mappa dei file: dove sta cosa
+
+Prima di scrivere un aiuto nuovo, cerca qui: quasi tutto ciò che serve in più punti esiste già.
+
+| Serve… | Dove |
+| --- | --- |
+| Schema di un'entità e suoi valori predefiniti | `shared/model/graph.ts` (scene, collegamenti, gruppi, finali, incontri), `catalog.ts` (NPC, enemy, oggetti, quest, dialoghi), `logic.ts` (condizioni, gate, effetti, prove), `project.ts` (progetto, impostazioni, libreria) |
+| Creare un'entità vuota | `shared/model/factories.ts`: `makeScene`, `makeLink`, `makeGroup`, `makeEncounter`, `makeEnding` (colori da `ENDING_COLORS` in `graph.ts`), `makeDialogLine`, `makeDialogChoice`; per i cataloghi `Npc.parse({ id, name })` ecc. o `createEntity` (`lib/entities.tsx`) |
+| Id nuovi, prefissi, riferimenti `{ type, id }` | `shared/model/ids.ts` (`newId`, `ID_PREFIX`, `Ref`) |
+| Chi usa un'entità ("Usato in"), link nei documenti | `shared/model/usage.ts` (`buildUsageIndex`, `DOC_LINK`) |
+| Nome leggibile, frasi su condizioni ed effetti | `shared/engine/describe.ts` (`entityName`, `describeCondition`, `describeEffect`, `checkName`) |
+| Riferimenti rotti, elenco delle prove, id esistenti | `shared/engine/refs.ts` (`findRefs`, `allChecks`, `existingIds`, `TYPE_NAMES`) |
+| Transizioni, raggiungibilità, percorso decisivo, unicità dei collegamenti | `shared/engine/graph.ts` (`transitions`, `reachableFromStart`, `decisivePath`, `canLink`) |
+| Gruppi annidati e selezione per gruppi | `shared/engine/groups.ts`: gerarchia (`groupDescendants`, `groupAncestors`, `isGroupOrAncestor`, `commonAncestor`, `canMoveGroupInto`), gruppi selezionati per intero (`fullySelectedGroups`, `selectedGroups`, `selectionParts`), piani di `Raggruppa` e del rilascio su un gruppo (`planGrouping`, `planMoveInto`), pulizia di entrate/uscite (`pruneGroupEnds`) |
+| Incontri che restano senza scena e chi ne blocca l'eliminazione | `shared/engine/encounters.ts` (`encountersOrphanedBy`, `encountersWithoutScene`, `encounterBlockers`) |
+| Confronto del testo nelle ricerche (maiuscole uguali, accenti distinti) | `shared/engine/text.ts` (`matchesQuery`, `matchesAny`, `matchIndex`) |
+| Fonti di un requisito, effetti del progetto, scene di un dialogo | `shared/engine/sources.ts` (`effectSites`, `sourcesOf`, `stepsSatisfiedBy`, `scenesWithDialog`, `leaves`) |
+| Problemi del progetto | `shared/engine/validate.ts`: nel renderer usa `validateCached(p)` (una sola valutazione per versione del progetto); ogni problema ha un `code` stabile (`IssueCode`) |
+| Playtest | `shared/engine/evaluate.ts` (`initialPlayState`, `evalCondition`, `gateStatus`, `applyEffects`, `updateState`) |
+| Elenco dialoghi | `shared/engine/dialogList.ts` (`listDialogEntries`, `filterDialogs`) |
+| Modificare il progetto | `store/project.ts` (`apply`, `undo`, `redo`); `lib/entities.tsx` (`apply`, `useProject`, `getProject`, `options`, `createEntity`) |
+| Operazioni su scene, gruppi e incontri (creare, duplicare, eliminare con conferma, togliere un incontro, raggruppare) | `lib/sceneOps.ts` |
+| Avviare il playtest (stesse regole per pulsanti, menu e scorciatoie) | `lib/playtest.ts` (`playFromStart`, `playFromScene`, `canPlayFromStart`) |
+| Scorciatoie | `lib/commands.ts` (registro `COMMANDS`, `useKbd`, `kbdLabel`), `lib/shortcuts.ts` (`useCommand`, `useCloseKey`) |
+| Aprire una scheda o un'entità | `store/ui.ts` (`setView`, `openSheet`, `openEntity`), `dock/bridge.ts` (`dockBridge.openPanel`) |
+| Disposizione del grafo (nodi, archi, gruppi collassati) | `components/graph/buildGraph.ts` (`buildGraph`, `sceneTopLeft`); aggancio in `snap.ts` |
+| Conferma, finestra modale, menu a comparsa | `components/ui/ConfirmDialog.tsx` (`confirmDialog`), `ui/Sheet.tsx` (`Sheet`, `Section`, `EditHint`), `ui/form.tsx` (`useClickOutside`: clic fuori o Esc) |
+| Campo di ricerca | `components/ui/SearchInput.tsx` (lente, svuota, filtro mentre si scrive): ogni ricerca dell'app lo usa, con `matchesQuery` per il confronto |
+| Pulsanti, chip del tag, classi | `components/ui/primitives.tsx` (`DangerButton`, `ToolbarButton`, `IconButton`, `TagChip`, `cn`) |
+
 ## Convenzioni
 
 - Interfaccia e commenti in italiano, commenti brevi.
 - Id prefissati: `newId('scene')` → `scn_xxxxxxxxxx`. Il progetto di esempio usa id leggibili fissi (es. `scn_cantina`).
 - Le modifiche al progetto passano solo da `useProjectStore().apply(etichetta, bozza => …, mergeKey?)`. Gli helper di `lib/entities.tsx` (`apply`, `useProject`, `options`) lo avvolgono.
-- Nuove impostazioni dell'app in `Prefs` (`store/ui.ts`, localStorage `graforum.prefs`), lette e scritte con `setPrefs`. Prefs attuali: `theme`, `uiScale`, `textScale`, `snap`, `shortcuts`, `autoCheckUpdates`, `layout`.
+- Nuove impostazioni dell'app in `Prefs` (`store/ui.ts`, localStorage `graforum.prefs`), lette e scritte con `setPrefs`. Prefs attuali: `theme`, `uiScale`, `textScale`, `snap`, `shortcuts`, `autoCheckUpdates`, `layout`, `savedFilters` (viste dei filtri; prima stavano in `graforum.savedFilters`, che si legge ancora una volta per recuperarle). I progetti recenti (`graforum.recent`) sono una cronologia, non un'impostazione, e restano a parte.
 - Stile: misure del README di handoff (controlli 28–32px, etichette di categoria mono 10px maiuscolo, sezioni numerate "01 · ETICHETTA"). Token colore: `tx/tx2/tx3`, `ac`, `safe`, `warn`, `err`, `line/line2`, `raised/sunken/panel/hover`.
 - Layout responsive: righe con `flex-wrap`, `min-w-0` e `basis-*` al posto di larghezze fisse (un `flex-1` in una riga che va a capo ha bisogno di `basis-1`, una riga `flex-col` con wrap va in `flex-nowrap`).
+- Entità nuove con le fabbriche di `shared/model/factories.ts` (o `Schema.parse({ id, … })`): niente oggetti scritti campo per campo, così un campo aggiunto allo schema vale ovunque.
+- **Ricerca:** ogni campo di ricerca è un `SearchInput` e ogni confronto passa da `matchesQuery`/`matchesAny`/`matchIndex`: maiuscole indifferenti, accenti distinti («città» non trova «citta»). Per cambiare la regola basta `shared/engine/text.ts`.
+- **Incontri:** un incontro esiste solo dentro le scene. Eliminando una scena o togliendo un incontro dalla sua ultima scena, l'incontro si elimina (con conferma); se qualcosa lo usa ancora (es. un requisito di quest) l'operazione si blocca e mostra "Usato in".
+- **Tastiera:** i comandi di ambito `graph` e `dialog` tacciono mentre è aperta una finestra modale (`ui.sheet`). Menu e riquadri a comparsa si chiudono con la combinazione di `closeSheet` tramite `useClickOutside` o `useCloseKey`, che fermano il tasto prima degli altri ascoltatori. I tasti dentro i campi di testo (Invio conferma, Esc annulla, frecce nei menu a tendina) sono comportamento del controllo, non comandi.
 
 ## Stato per area
 
@@ -60,10 +94,22 @@ src/renderer Interfaccia React
 - **Versioni:** `SCHEMA_VERSION` = 1, nessuna migrazione ancora. `migrate.ts` + regola in `.claude/rules/modello-dati.md` (si carica solo toccando i file del modello): leggere sempre i file vecchi, copia `nome.dng.v<N>.bak` prima di riscrivere un file migrato.
 
 ### Motore (`src/shared/engine`)
-Descrizioni in parole (`describe`), valutazione per il playtest con avanzamento automatico degli step (`evaluate`), transizioni, raggiungibilità e percorso decisivo (`graph`), fonti dei requisiti (`sources`), validazione (`validate`: partenza mancante, scene irraggiungibili, vicoli ciechi, Warning senza incontro, incontri senza enemy, gruppi senza entrata/uscita, finali incompleti, riferimenti a entità eliminate, requisiti senza fonte), elenco "Avanzamento" (`progress`), elenco dialoghi (`dialogList`).
+Descrizioni in parole (`describe`), valutazione per il playtest con avanzamento automatico degli step (`evaluate`), transizioni, raggiungibilità, percorso decisivo e unicità dei collegamenti (`graph`), gerarchia dei gruppi (`groups`), fonti dei requisiti (`sources`), elenco "Avanzamento" (`progress`), elenco dialoghi (`dialogList`).
+
+**Validazione** (`validate`, nel renderer `validateCached`):
+- *Errori* (bloccano l'export nell'ambito): partenza mancante, scena Warning senza incontro, incontro senza enemy, finale senza etichetta o colore, riferimento a entità eliminata, dialogo senza battuta iniziale.
+- *Avvisi:* scena irraggiungibile, vicolo cieco (nessuna uscita e non finale), incontro senza scena, gruppo senza entrata o uscita, condizione impossibile (nessuno produce oggetto, flag, stato di quest, dialogo o esito richiesto).
+- *Note:* step senza requisiti, dialogo mai assegnato, enemy mai usato, oggetto senza immagine.
+- **Correzioni rapide** (pulsante con la chiave inglese accanto al problema, `ValidationPanel.quickFix`): partenza = prima scena, aggiungi incontro, segna come finale, prima scena del gruppo (o dei sottogruppi) come entrata/uscita, elimina l'incontro senza scena. Si scelgono dal `code` del problema, quindi cambiare titoli e testi non le rompe.
 
 ### Canvas (`components/graph`)
-Nodi scena, archi "floating" con scostamento per andata/ritorno, gruppi annidati e collassabili, minimappa, snap stile Figma (`snap.ts`, Alt lo sospende), selezione multipla (riquadro col sinistro, vista col centrale), menu contestuale, trascinamento dal catalogo. Un gruppo si trascina dall'etichetta; tenendo scene ~1 s sull'area di un gruppo le si aggiunge. Il clic su un gruppo lo seleziona e apre la scheda "Scheda". Scena: copertina stile Trello, etichette personalizzate, tag nascondibile.
+Nodi scena, archi "floating" con scostamento per andata/ritorno, gruppi annidati e collassabili, minimappa, snap stile Figma (`snap.ts`, Alt lo sospende), selezione multipla (riquadro col sinistro, vista col centrale), menu contestuale (agisce su tutta la selezione se la scena cliccata ne fa parte, Esc lo chiude), trascinamento dal catalogo (NPC e oggetti si aggiungono alla scena, un enemy crea un incontro e rende la scena Warning).
+
+**Selezione e gruppi:**
+- Un gruppo è *selezionato* quando lo sono tutte le sue scene, anche dei sottogruppi; una carta di gruppo collassato selezionata (`ui.selectedCardIds`) conta come gruppo intero. Il gruppo aperto selezionato ha fondo e bordo appena tinti d'accento (`groupSelected` nei dati del nodo); la barra di stato lo nomina.
+- **Raggruppa la selezione** (`groupSelection`): i gruppi selezionati per intero restano gruppi e diventano sottogruppi del nuovo; le altre scene entrano direttamente; il nuovo gruppo nasce nell'antenato comune più vicino. Le posizioni non cambiano, quindi un gruppo uscito dal suo vecchio genitore può restarne sopra finché non lo sposti.
+- **Rilascio su un gruppo** (tenere fermo ~1 s sull'area, poi rilasciare): vale per scene, gruppi trascinati dall'etichetta, carte collassate e gruppi selezionati per intero, che entrano come sottogruppi. Non si entra in se stessi o in un discendente, né nel genitore o in un antenato (si sale solo con "Rimuovi dal gruppo").
+- Dopo ogni spostamento `pruneGroupEnds` toglie entrate e uscite che non sono più scene del gruppo o dei sottogruppi. Un gruppo si trascina dall'etichetta; tenendo scene ~1 s sull'area di un gruppo le si aggiunge. Il clic su un gruppo lo seleziona e apre la scheda "Scheda". Scena: copertina stile Trello, etichette personalizzate, tag nascondibile.
 
 ### Dock di schede (`src/renderer/src/dock`)
 - `dockview-react`; il grafo è al centro, aree sinistra/destra/basso sono *edge group* comprimibili. Schede (`panelList.ts`): `graph`, `inspector` ("Scheda": scena o gruppo secondo la selezione), `catalog`, `validation`, `playtest`, `dialogs`, `documents`. `PANEL_AREA` dice solo dove nasce una scheda nel layout standard; poi si sposta ovunque.
@@ -72,7 +118,7 @@ Nodi scena, archi "floating" con scostamento per andata/ritorno, gruppi annidati
 - **Ingrandisci** (`maximize.ts`, Ctrl+Spazio): chiude le aree laterali e porta al centro, finché dura, una scheda che stava in un'area (dockview non ingrandisce gli edge group).
 - **Staccare** (`popout.ts`): `addPopoutGroup` + `window.open('/popout.html')`; stesso contesto JS, quindi store condivisi. Una scheda di un'area laterale passa prima al centro (dockview non stacca gli edge group). Tema e scala del testo si copiano nella finestra; le scorciatoie vi sono attaccate con `addShortcutWindow`.
 - **Layout** salvato in `Prefs.layout` (validato da `isUsableLayout`; se non vale, layout standard); pulsante "Layout standard" in alto a destra (`resetLayout`); menu ⋯ su ogni gruppo (`PanelMenu.tsx`) per aprire qualsiasi scheda in quel gruppo; menu Finestra; comandi nel gruppo "Layout".
-- `window.graforumDock` espone l'API di dockview alle prove automatiche.
+- `window.graforumDock` (API di dockview) e `window.graforumStores` (`{ ui, project }`) servono alle prove automatiche.
 
 ### Scheda scena e gruppo
 `components/scene/SceneSheet.tsx` e `GroupSheet.tsx` hanno due forme: **scheda del dock** (`DockedScenePanel`, `DockedGroupPanel`, dentro `inspector`) e **finestra modale al centro** (`SceneSheet` 1120×944, `GroupSheet` 760×760, gestite da `SheetHost` con `ui.sheet`). Dalla scheda un pulsante "Apri in una finestra al centro" (anche nel menu contestuale), dalla finestra "Aggancia al dock". Tutto il resto (catalogo, impostazioni, immagini, viste incrociate, esportazione) è solo modale. Elimina con `DangerButton` + conferma.
@@ -105,6 +151,35 @@ Nodi scena, archi "floating" con scostamento per andata/ritorno, gruppi annidati
 - **Selettori nello smoke:** le finestre modali si riconoscono con `[data-sheet-level]`; il titolo della scheda scena è un `input`.
 - **Dockview e gli edge group:** non si ingrandiscono né si staccano; per questo `maximize.ts` e `popout.ts` li portano al centro. `api.getGroup()` ha tipi poco comodi: si usa `api.groups.find(...)`.
 - **Zod 4:** i default degli oggetti si scrivono con `.prefault({})`.
+- **Tasti nello smoke:** gli eventi sintetici si inviano a `window`, non a un elemento: un ascoltatore messo su `document` non li riceve. Per questo `useCloseKey` ascolta sulla finestra, in cattura.
+- **Ponte del dock e ricaricamento a caldo:** `dockBridge` si compila in un effetto (`connectDock` in `DockHost`), non in `onReady`. Se React riesegue gli effetti senza ricreare il dock (StrictMode, modifica di un file con `npm run dev`), il ponte si ricollega; prima restava vuoto e menu, scorciatoie e pulsanti che aprono le schede non facevano nulla.
+- **Comandi globali fuori dalle schede:** playtest, validazione, avanzamento sono collegati in `App.tsx`, non nella barra del grafo: devono funzionare anche se la scheda Grafo è chiusa o non in vista. La ricerca (Ctrl+K) porta prima in vista il grafo, dove sta il campo.
+- **Lo stesso tasto su due ascoltatori della `window`:** `stopPropagation` non ferma l'altro. Per dare la precedenza a un menu o a una conferma si ascolta in cattura (`useCloseKey`, `ConfirmHost`).
+
+## Test
+
+`npx vitest run` esegue tutti i file `src/**/*.test.ts` in Node (niente DOM). Si testano le parti pure; l'interfaccia vera la prova lo smoke.
+
+| File | Cosa verifica |
+| --- | --- |
+| `shared/model/model.test.ts` | Id con prefisso; progetto vuoto con abilità e tipi predefiniti; esempio valido dopo un giro JSON; indice "Usato in" |
+| `shared/model/factories.test.ts` | Le fabbriche `make*` producono entità che lo schema accetta, con i valori predefiniti attesi e id sempre nuovi; colori dei finali a rotazione; gruppo vuoto |
+| `shared/model/migrate.test.ts` | Migrazioni in sequenza, partenza dalla versione giusta, file più nuovi rifiutati, migrazioni mancanti, input non validi, una migrazione per ogni versione precedente |
+| `shared/engine/engine.test.ts` | Validazione dell'esempio (Warning senza incontro, vicolo cieco, riferimenti rotti, irraggiungibili); percorso decisivo; playtest con gate bloccato e avanzamento automatico degli step; descrizioni; fonti degli step; "Avanzamento"; elenco e filtri dei dialoghi |
+| `shared/engine/evaluate.test.ts` | Stato iniziale e preset; ottenere/perdere oggetti; immutabilità; sblocca/blocca; avanzare a uno step; completare la quest; gruppi E/O; condizioni personalizzate; esiti degli incontri |
+| `shared/engine/helpers.test.ts` | Discendenti e antenati dei gruppi (anche in ordine sparso e con cicli); `canLink`; `allChecks`/`checkName`; `scenesWithDialog`; confronto del testo (maiuscole uguali, accenti distinti, posizione); `validateCached` |
+| `shared/engine/groups.test.ts` | Gruppi selezionati per intero (anche con carte collassate); antenato comune; Raggruppa con gruppi interi, scene sciolte e nel gruppo padre; rilascio di gruppi e selezioni in un gruppo, senza cicli né salite; pulizia di entrate e uscite |
+| `shared/engine/encounters.test.ts` | Incontri resi orfani da eliminazione di scene o distacco; incontri in più scene; orfani preesistenti; avviso "Incontro senza scena"; chi blocca l'eliminazione; codici stabili dei problemi |
+| `shared/export/exporter.test.ts` | Ambito gruppo (scene e catalogo usato); blocco solo per errori nell'ambito; JSON senza dati solo-editor e reimportabile; HTML senza script |
+| `main/projectFile.test.ts` | `.dng`: salva e riapre identico, solo immagini in libreria, copia `.bak`, file senza `project.json`, file più nuovi, copia unica prima della migrazione |
+| `renderer/src/dock/layout.test.ts` | Layout salvati accettati o rifiutati (`isUsableLayout`); rimozione delle finestre staccate (`stripPopouts`) |
+| `renderer/src/lib/commands.test.ts` | Registro delle scorciatoie: id unici, combinazioni predefinite senza conflitti e nel formato giusto, personalizzazioni, conflitti per ambito, etichette in italiano, lettura dei tasti |
+| `renderer/src/lib/playtest.test.ts` | Playtest dall'inizio solo con scena di partenza (come il pulsante); dalla selezione o da una scena indicata |
+| `renderer/src/store/project.test.ts` | `apply`, annulla/ripeti, `mergeKey`, limite di 200 passi, modifiche non salvate |
+| `renderer/src/components/graph/buildGraph.test.ts` | Nodi e archi dell'esempio; ingombro dei gruppi annidati; gruppi collassati (carta, scene nascoste, archi spostati sulla carta); `sceneTopLeft` |
+| `renderer/src/components/graph/snap.test.ts` | Aggancio a bordi e centri entro la soglia, guide, nessun aggancio oltre la soglia |
+| `renderer/src/components/search/search.test.ts` | Ricerca globale (titoli, cataloghi, scene da evidenziare, accenti distinti); filtri per gruppo con sottogruppi, tag, finali, problemi, entità usata, combinati; viste salvate nelle preferenze |
+| `scripts/smoke.cjs` (Electron) | Etichette dei gruppi cliccabili; collassa/espandi; trascinamento dei gruppi; gruppo colorato quando tutte le sue scene sono selezionate; Raggruppa che tiene la Locanda intera come sottogruppo; gruppo trascinato e rilasciato dentro un altro; cursore di spostamento; etichette, copertina e tag dalla scheda scena; Canc con conferma; menu contestuale con Esc; tasti del grafo fermi sotto una finestra modale; scena con incontro usato da una quest non eliminabile; Ctrl+K da un'altra scheda; gruppo nella scheda; dock (layout standard, ingrandisci, aree, salvataggio, menu Finestra e ⋯); dialoghi nella stessa scheda; scheda scena modale e a 260px |
 
 ## Limiti noti
 

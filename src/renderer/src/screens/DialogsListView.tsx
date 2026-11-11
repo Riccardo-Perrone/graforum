@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { MessageSquare, Search } from 'lucide-react'
+import { MessageSquare } from 'lucide-react'
 import { filterDialogs, listDialogEntries, type DialogSummary } from '@shared/engine'
 import { Combobox } from '../components/ui/Combobox'
 import { Segmented } from '../components/ui/form'
-import { ToolbarButton } from '../components/ui/primitives'
+import { SearchInput } from '../components/ui/SearchInput'
 import { useProject } from '../lib/entities'
-import { useCommand } from '../lib/shortcuts'
 import { openEntity, useUiStore } from '../store/ui'
 
 // Vista "Dialoghi": i dialoghi principali del progetto, filtrabili per NPC, scena e contenuto, raggruppabili per NPC o scena.
@@ -65,15 +64,7 @@ export function DialogsListView() {
           options={p.scenes.map((s) => ({ id: s.id, label: s.title }))}
           onChange={(v) => ui.setDialogList({ sceneId: v })}
         />
-        <div className="relative">
-          <Search size={13} className="pointer-events-none absolute top-[8px] left-2 text-tx3" />
-          <input
-            className="h-7 w-[260px] rounded-md border border-line bg-sunken pr-2 pl-7 text-tx outline-none focus:border-ac"
-            placeholder="Cerca nel contenuto…"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-          />
-        </div>
+        <SearchInput className="h-7 w-[260px]" placeholder="Cerca nel contenuto…" value={draft} onChange={setDraft} />
         <span className="flex-1" />
         <span className="text-tx3">Raggruppa per</span>
         <Segmented

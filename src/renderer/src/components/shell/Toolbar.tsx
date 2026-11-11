@@ -1,11 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Check, ChevronDown, CircleAlert, Flag, ListOrdered, OctagonX, Play, Plus, ShieldCheck, Spline, SquareDashed } from 'lucide-react'
-import { validate } from '@shared/engine'
+import { validateCached } from '@shared/engine'
 import { useProject } from '../../lib/entities'
 import { groupSelection } from '../../lib/sceneOps'
 import { useKbd } from '../../lib/commands'
 import { dockBridge } from '../../dock/bridge'
-import { useCommand } from '../../lib/shortcuts'
+import { playFromStart } from '../../lib/playtest'
 import { useUiStore } from '../../store/ui'
 import { FiltersPopover } from '../search/FiltersPopover'
 import { useFilterStore } from '../search/search'
@@ -71,17 +71,11 @@ function PathSelector() {
 export function Toolbar({ onNewScene }: { onNewScene(): void }) {
   const p = useProject()
   const ui = useUiStore()
-  const issues = useMemo(() => validate(p), [p])
+  const issues = validateCached(p)
   const errors = issues.filter((i) => i.severity === 'error').length
   const warnings = issues.filter((i) => i.severity === 'warning').length
   const { filters, setFilters } = useFilterStore()
 
-  const playFromStart = () => ui.setView({ kind: 'playtest', startSceneId: null })
-  const playFromHere = () => ui.selectedSceneIds[0] && ui.setView({ kind: 'playtest', startSceneId: ui.selectedSceneIds[0] })
-  useCommand('playFromStart', playFromStart)
-  useCommand('playFromHere', playFromHere)
-  useCommand('toggleValidation', () => dockBridge.togglePanel?.('validation'))
-  useCommand('crossProgress', () => ui.openSheet({ kind: 'cross', tab: 'progress' }))
   const kbdNewScene = useKbd('newScene')
   const kbdGroup = useKbd('groupSelection')
   const kbdPlay = useKbd('playFromStart')
@@ -95,7 +89,7 @@ export function Toolbar({ onNewScene }: { onNewScene(): void }) {
         <ToolbarButton icon={Spline} title="Trascina dalla maniglia destra di una scena verso un’altra, oppure usa “Collega” nella scheda scena">
           Collega
         </ToolbarButton>
-        <ToolbarButton icon={SquareDashed} kbd={kbdGroup} disabled={ui.selectedSceneIds.length === 0} title="Raggruppa le scene selezionate" onClick={() => groupSelection()}>
+        <ToolbarButton icon={SquareDashed} kbd={kbdGroup} disabled={ui.selectedSceneIds.length === 0 && ui.selectedCardIds.length === 0} title="Raggruppa la selezione (i gruppi selezionati per intero restano gruppi)" onClick={() => groupSelection()}>
           Gruppo
         </ToolbarButton>
       </div>

@@ -57,6 +57,48 @@ const PAGE_TEST = `(async () => {
   await drag('Villaggio', 0, 80)
   check(sceneTf('Piazza del villaggio') !== outBefore2 && sceneTf('Sala comune') !== inBefore2, 'il gruppo esterno non porta con se tutto')
 
+  // 3b. Selezione con gruppi: tutte le scene della Locanda selezionate → il gruppo si colora; "Raggruppa" con una scena
+  //     esterna mantiene la Locanda intera come sottogruppo; trascinare un gruppo su un altro (con pausa) lo inserisce.
+  const stores = window.graforumStores
+  const proj = () => stores.project.getState().project
+  const groupOf = (id) => proj().groups.find((g) => g.id === id)
+  const LOCANDA = ['scn_sala', 'scn_camera3', 'scn_cantina', 'scn_tesoro']
+  stores.ui.getState().setSelection(LOCANDA)
+  await sleep(400)
+  check(!!byName('Locanda')?.querySelector('[data-group-selected]'), 'selezionando tutte le scene della Locanda il gruppo non risulta selezionato')
+  check(!byName('Villaggio')?.querySelector('[data-group-selected]'), 'il Villaggio risulta selezionato senza tutte le sue scene')
+  stores.ui.getState().setSelection([...LOCANDA, 'scn_strada'])
+  await sleep(300)
+  const groupBtn = [...document.querySelectorAll('button')].find((b) => (b.title || '').startsWith('Raggruppa la selezione'))
+  check(!!groupBtn && !groupBtn.disabled, 'pulsante Gruppo assente o disattivato con una selezione')
+  groupBtn?.click()
+  await sleep(500)
+  const created = proj().groups.find((g) => g.name === 'Nuovo gruppo')
+  check(!!created && created.parentId === null, 'Raggruppa: il nuovo gruppo non nasce al primo livello')
+  check(!!created && groupOf('grp_locanda').parentId === created.id, 'Raggruppa: la Locanda non è diventata sottogruppo del nuovo gruppo')
+  check(!!created && proj().scenes.find((s) => s.id === 'scn_strada').groupId === created.id && proj().scenes.find((s) => s.id === 'scn_sala').groupId === 'grp_locanda', 'Raggruppa: le scene non hanno mantenuto la gerarchia')
+  stores.ui.getState().setSelection([])
+  await sleep(400)
+  // Trascina la Locanda sopra la piazza (area del Villaggio), resta fermo oltre la pausa, rilascia.
+  const handle = byName('Locanda').querySelector('.group-handle')
+  const hr = handle.getBoundingClientRect()
+  const pz = [...document.querySelectorAll('.react-flow__node-scene')].find((n) => n.textContent.includes('Piazza del villaggio')).getBoundingClientRect()
+  const sx = hr.x + 8, sy = hr.y + hr.height / 2, tx = pz.x + pz.width / 2, ty = pz.y + pz.height / 2
+  ev('mousedown', sx, sy, handle)
+  for (let i = 1; i <= 10; i++) { ev('mousemove', sx + (tx - sx) * i / 10, sy + (ty - sy) * i / 10, window); await sleep(30) }
+  await sleep(1200)
+  ev('mousemove', tx + 1, ty + 1, window)
+  await sleep(100)
+  check(!!byName('Villaggio')?.textContent.includes('RILASCIA'), 'trascinando un gruppo su un altro, il bersaglio non si arma')
+  ev('mouseup', tx + 1, ty + 1, window)
+  await sleep(500)
+  check(groupOf('grp_locanda').parentId === 'grp_brumavalle', 'trascinare un gruppo su un altro non lo inserisce come sottogruppo')
+  // Torna all'esempio di partenza: annulla trascinamento e raggruppamento.
+  stores.project.getState().undo()
+  stores.project.getState().undo()
+  await sleep(500)
+  check(groupOf('grp_locanda').parentId === 'grp_brumavalle' && !proj().groups.some((g) => g.name === 'Nuovo gruppo'), 'annulla non ripristina i gruppi')
+
   // 4. Cursore di spostamento della vista col tasto centrale.
   window.dispatchEvent(new MouseEvent('mousedown', { button: 1 }))
   check(document.body.classList.contains('is-panning'), 'cursore di spostamento vista non attivo')
@@ -120,6 +162,48 @@ const PAGE_TEST = `(async () => {
   await sleep(500)
   check(!document.querySelector('[role="alertdialog"]'), 'il secondo Canc non chiude la conferma')
   check(scenes() === before - 1, 'il secondo Canc non elimina la scena')
+
+  // 5b. Menu contestuale della scena: si apre col destro e si chiude con Esc (senza altri effetti).
+  const menuItem = (txt) => [...document.querySelectorAll('div.fixed button')].find((b) => b.textContent.includes(txt))
+  const sala = () => [...document.querySelectorAll('.react-flow__node-scene')].find((n) => n.textContent.includes('Sala comune'))
+  const openMenu = () => {
+    const r = sala().getBoundingClientRect()
+    sala().dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: r.x + 20, clientY: r.y + 20, view: window, button: 2 }))
+  }
+  openMenu()
+  await sleep(300)
+  check(!!menuItem('Apri in finestra al centro'), 'il menu contestuale della scena non si apre')
+  check(!!menuItem('Elimina') && /Canc/.test(menuItem('Elimina').textContent), 'la voce Elimina del menu non mostra la scorciatoia')
+  key('Escape')
+  await sleep(300)
+  check(!menuItem('Apri in finestra al centro'), 'Esc non chiude il menu contestuale')
+
+  // 5c. Con una finestra modale aperta i tasti del grafo tacciono: N non crea scene sotto la finestra.
+  openMenu()
+  await sleep(300)
+  menuItem('Apri in finestra al centro')?.click()
+  await sleep(500)
+  check(!!document.querySelector('[data-sheet-level]'), 'la scheda scena non si apre in finestra dal menu contestuale')
+  const beforeN = scenes()
+  key('n')
+  await sleep(400)
+  check(scenes() === beforeN, 'con una finestra aperta il tasto N crea comunque una scena')
+  key('Escape')
+  await sleep(400)
+  check(!document.querySelector('[data-sheet-level]'), 'Esc non chiude la finestra della scena')
+
+  // 5d. Una scena il cui incontro serve a una quest non si elimina: compare l'elenco "Usato in" e la scena resta.
+  const cantina = [...document.querySelectorAll('.react-flow__node-scene')].find((n) => n.textContent.includes('Cantina infestata'))
+  const beforeCantina = scenes()
+  cantina.click()
+  await sleep(300)
+  key('Delete')
+  await sleep(500)
+  const blockedSheet = document.querySelector('[data-sheet-level]')
+  check(!!blockedSheet && blockedSheet.textContent.includes('ancora in uso') && !document.querySelector('[role="alertdialog"]'), 'eliminare una scena con un incontro usato da una quest non viene bloccato')
+  key('Escape')
+  await sleep(400)
+  check(!document.querySelector('[data-sheet-level]') && scenes() === beforeCantina, 'la scena bloccata è stata eliminata o la finestra non si chiude')
 
   // 6. Il clic sul nome di un gruppo lo mostra nella scheda a sinistra.
   const nameBtn = byName('Locanda')?.querySelector('.group-handle').querySelectorAll('button')[1]
@@ -215,6 +299,13 @@ const PAGE_TEST = `(async () => {
   ;[...document.querySelectorAll('nav button')].find((b) => b.textContent.includes('Documenti')).click()
   await sleep(600)
   check(!dock.hasMaximizedGroup() && dock.getPanel('documents')?.api.isActive, 'con una scheda ingrandita, il menu non apre la scheda scelta')
+
+  // 10b. Ctrl+K da un'altra scheda: il grafo torna in vista e il campo di ricerca prende il fuoco.
+  window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true, cancelable: true }))
+  await sleep(500)
+  check(dock.getPanel('graph').api.isActive && (document.activeElement?.placeholder || '').startsWith('Cerca scene'), 'Ctrl+K non porta alla ricerca del grafo da un altra scheda')
+  document.activeElement?.blur()
+  await sleep(200)
 
   // 11. Scheda scena: modale al centro e ritorno al dock; nessuno scorrimento orizzontale a larghezze piccole.
   const scene = [...document.querySelectorAll('.react-flow__node-scene')].find((n) => n.textContent.includes('Cantina infestata'))

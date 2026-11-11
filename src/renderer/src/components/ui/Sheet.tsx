@@ -143,6 +143,12 @@ export function Row({ children, className, tone }: { children: ReactNode; classN
   )
 }
 
+/** Piè delle schede modificabili: le modifiche valgono subito e si annullano con la scorciatoia di Annulla. */
+export function EditHint() {
+  const kbdUndo = useKbd('undo')
+  return <span>Le modifiche valgono subito{kbdUndo ? ` · ${kbdUndo} annulla` : ''}</span>
+}
+
 export function Empty({ children }: { children: ReactNode }) {
   return <div className="rounded-lg border border-dashed border-line2 px-3 py-2.5 text-[12px] text-tx3">{children}</div>
 }

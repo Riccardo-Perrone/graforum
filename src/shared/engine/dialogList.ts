@@ -1,4 +1,6 @@
 import type { Project } from '../model'
+import { scenesWithDialog } from './sources'
+import { matchesQuery } from './text'
 
 // Elenco piatto di tutte le battute e scelte dei dialoghi, per la vista "Dialoghi".
 
@@ -47,13 +49,10 @@ export function listDialogEntries(p: Project): DialogEntry[] {
   })
 }
 
-/** Filtra per NPC, scena e testo (senza distinguere maiuscole e accenti). */
+/** Filtra per NPC, scena e testo (maiuscole indifferenti, accenti distinti: vedi `text.ts`). */
 export function filterDialogEntries(entries: DialogEntry[], f: DialogFilter): DialogEntry[] {
-  const norm = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
-  const q = norm((f.query ?? '').trim())
-  return entries.filter(
-    (e) => (!f.npcId || e.npcId === f.npcId) && (!f.sceneId || e.sceneIds.includes(f.sceneId)) && (!q || norm(e.text).includes(q))
-  )
+  const q = f.query ?? ''
+  return entries.filter((e) => (!f.npcId || e.npcId === f.npcId) && (!f.sceneId || e.sceneIds.includes(f.sceneId)) && matchesQuery(e.text, q))
 }
 
 export interface DialogSummary {
@@ -68,16 +67,15 @@ export interface DialogSummary {
 
 /** Dialoghi principali (uno per dialogo) che passano i filtri; la ricerca guarda titolo, battute e scelte. */
 export function filterDialogs(p: Project, entries: DialogEntry[], f: DialogFilter): DialogSummary[] {
-  const norm = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
-  const q = norm((f.query ?? '').trim())
+  const q = (f.query ?? '').trim()
   const hits = filterDialogEntries(entries, { query: f.query })
   return p.dialogs.flatMap((d) => {
     const own = entries.filter((e) => e.dialogId === d.id)
-    const sceneIds = own[0]?.sceneIds ?? p.scenes.filter((s) => s.npcs.some((n) => n.dialogs.some((o) => o.dialogId === d.id))).map((s) => s.id)
+    const sceneIds = own[0]?.sceneIds ?? scenesWithDialog(p, d.id).map((s) => s.id)
     if (f.npcId && d.npcId !== f.npcId) return []
     if (f.sceneId && !sceneIds.includes(f.sceneId)) return []
     const matches = q ? hits.filter((e) => e.dialogId === d.id) : []
-    if (q && !matches.length && !norm(d.title).includes(q)) return []
+    if (q && !matches.length && !matchesQuery(d.title, q)) return []
     return [{ id: d.id, title: d.title, npcId: d.npcId, sceneIds, lineCount: d.lines.length, matches }]
   })
 }

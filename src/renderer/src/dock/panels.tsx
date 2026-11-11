@@ -3,12 +3,12 @@ import type { IDockviewPanelProps } from 'dockview-react'
 import { ReactFlowProvider, useReactFlow } from '@xyflow/react'
 import { CatalogPanel } from '../components/catalog/CatalogPanel'
 import { GraphCanvas } from '../components/graph/GraphCanvas'
-import { SCENE_NODE_WIDTH } from '../components/graph/SceneNode'
+import { sceneTopLeft } from '../components/graph/buildGraph'
 import { DockedGroupPanel } from '../components/scene/GroupSheet'
 import { DockedScenePanel } from '../components/scene/SceneSheet'
 import { Toolbar } from '../components/shell/Toolbar'
 import { ValidationPanel } from '../components/validation/ValidationPanel'
-import { createScene, groupSelection, removeFromGroup } from '../lib/sceneOps'
+import { canGroupSelection, createScene, groupSelection, removeFromGroup } from '../lib/sceneOps'
 import { useCommand } from '../lib/shortcuts'
 import { DialogEditor } from '../screens/DialogEditor'
 import { DialogsListView } from '../screens/DialogsListView'
@@ -32,11 +32,11 @@ function GraphBody() {
     // Si cerca nella scheda stessa, non nel documento: il grafo può stare in una finestra staccata.
     const canvas = body.current?.querySelector('.react-flow')?.getBoundingClientRect()
     const center = canvas ? flow.screenToFlowPosition({ x: canvas.left + canvas.width / 2, y: canvas.top + canvas.height / 2 }) : { x: 0, y: 0 }
-    createScene({ x: center.x - SCENE_NODE_WIDTH / 2, y: center.y - 68 })
+    createScene(sceneTopLeft(center))
   }, [flow])
 
   useCommand('newScene', newScene)
-  useCommand('groupSelection', () => selectedSceneIds.length && groupSelection())
+  useCommand('groupSelection', () => canGroupSelection() && groupSelection())
   useCommand('removeFromGroup', () => selectedSceneIds.length && removeFromGroup(selectedSceneIds))
   useCommand('toggleSnap', () => useUiStore.getState().setPrefs({ snap: !useUiStore.getState().snap }))
   useCommand('fitView', () => void flow.fitView({ padding: 0.15, duration: 200 }))

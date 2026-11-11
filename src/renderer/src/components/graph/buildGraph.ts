@@ -1,5 +1,6 @@
 import { MarkerType } from '@xyflow/react'
 import type { Condition, Project, Scene, SceneTag } from '@shared/model'
+import { groupAncestors, groupDescendants } from '@shared/engine'
 import type { CollapsedGroupFlowNode, GroupFlowNode } from './GroupNode'
 import type { LinkFlowEdge } from './LinkEdge'
 import { SCENE_NODE_WIDTH, type SceneFlowNode } from './SceneNode'
@@ -26,16 +27,8 @@ export function abbreviateSkill(name: string): string {
   return name.slice(0, 3).toUpperCase()
 }
 
-/** Gruppo e tutti i discendenti. */
-export function groupDescendants(p: Project, groupId: string): Set<string> {
-  const out = new Set([groupId])
-  let added = true
-  while (added) {
-    added = false
-    for (const g of p.groups) if (g.parentId && out.has(g.parentId) && !out.has(g.id)) (out.add(g.id), (added = true))
-  }
-  return out
-}
+/** Angolo in alto a sinistra di una scena da centrare nel punto dato. */
+export const sceneTopLeft = (center: { x: number; y: number }) => ({ x: center.x - SCENE_NODE_WIDTH / 2, y: center.y - SCENE_NODE_HEIGHT / 2 })
 
 export function buildGraph(project: Project): { nodes: FlowNode[]; edges: LinkFlowEdge[] } {
   const images = new Map(project.images.map((i) => [i.id, i]))
@@ -46,15 +39,9 @@ export function buildGraph(project: Project): { nodes: FlowNode[]; edges: LinkFl
 
   // Gruppi collassati più esterni: le loro scene sono nascoste e rappresentate da una carta.
   const groupById = new Map(project.groups.map((g) => [g.id, g]))
-  const collapsedAncestor = (groupId: string | null): string | null => {
-    let found: string | null = null
-    let g = groupId ? groupById.get(groupId) : undefined
-    while (g) {
-      if (g.collapsed) found = g.id
-      g = g.parentId ? groupById.get(g.parentId) : undefined
-    }
-    return found
-  }
+  // Il più esterno tra gli antenati collassati.
+  const collapsedAncestor = (groupId: string | null): string | null =>
+    groupAncestors(project.groups, groupId).findLast((id) => groupById.get(id)?.collapsed) ?? null
   const sceneProxy = new Map<string, string>()
   for (const s of project.scenes) {
     const c = collapsedAncestor(s.groupId)
@@ -104,7 +91,7 @@ export function buildGraph(project: Project): { nodes: FlowNode[]; edges: LinkFl
   }
 
   const scenesIn = (groupId: string) => {
-    const ids = groupDescendants(project, groupId)
+    const ids = groupDescendants(project.groups, groupId)
     return project.scenes.filter((s) => s.groupId && ids.has(s.groupId))
   }
 

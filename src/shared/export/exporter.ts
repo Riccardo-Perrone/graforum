@@ -1,4 +1,4 @@
-import { migrateProject, SCHEMA_VERSION, type Project, type Scene } from '../model'
+import { DOC_LINK, migrateProject, SCHEMA_VERSION, type Project, type Scene } from '../model'
 import { describeCheck, describeCondition, describeEffect, entityName } from '../engine/describe'
 import { findRefs } from '../engine/refs'
 import { validate, type Issue } from '../engine/validate'
@@ -224,7 +224,7 @@ export function exportHtml(p: Project, scope: ExportScope, opts: ExportOptions =
   }
   if (d.documents.length) {
     parts.push('<h2>Note per il master</h2>')
-    for (const doc of d.documents) parts.push(`<h3>${esc(doc.title)}</h3><pre style="white-space:pre-wrap;font:inherit">${esc(doc.markdown.replace(/@\[([^\]]*)\]\([^)]*\)/g, '$1'))}</pre>`)
+    for (const doc of d.documents) parts.push(`<h3>${esc(doc.title)}</h3><pre style="white-space:pre-wrap;font:inherit">${esc(doc.markdown.replace(DOC_LINK, '$1'))}</pre>`)
   }
   parts.push('</body></html>')
   return parts.join('')

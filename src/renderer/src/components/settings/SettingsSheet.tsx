@@ -7,7 +7,7 @@ import { apply, options, useProject } from '../../lib/entities'
 import { openEntity, useUiStore, type SettingsPage } from '../../store/ui'
 import { EntityChip } from '../logic/EntityChip'
 import { UpdateCard } from '../shell/UpdateCard'
-import { ENDING_PALETTE } from '../scene/SceneSheet'
+import { ENDING_COLORS } from '@shared/model'
 import { Combobox } from '../ui/Combobox'
 import { AddButton, Field, Segmented, Select, TextArea, TextInput, Toggle } from '../ui/form'
 import { IconButton, Kbd, cn } from '../ui/primitives'
@@ -275,7 +275,7 @@ function Endings() {
         {p.endings.map((e, i) => (
           <div key={e.id} className="grid grid-cols-[56px_1fr_1fr_110px_100px_36px] items-center gap-3 border-b border-line px-3 py-2 last:border-b-0">
             <div className="flex flex-wrap gap-1">
-              {ENDING_PALETTE.map((c) => (
+              {ENDING_COLORS.map((c) => (
                 <button key={c} type="button" onClick={() => apply('Colore finale', (d) => void (d.endings[i]!.color = c))} className={cn('size-3.5 rounded-[3px]', e.color === c && 'shadow-[0_0_0_1.5px_var(--tx)]')} style={{ background: c }} />
               ))}
             </div>

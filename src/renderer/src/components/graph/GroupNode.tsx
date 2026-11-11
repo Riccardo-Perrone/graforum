@@ -16,6 +16,8 @@ export interface GroupNodeData extends Record<string, unknown> {
   dim?: boolean
   /** Bersaglio dell'aggiunta per trascinamento: le scene trattenute qui verranno inserite nel gruppo. */
   drop?: boolean
+  /** Tutte le scene del gruppo (anche dei sottogruppi) sono selezionate: il gruppo conta come selezionato. */
+  groupSelected?: boolean
 }
 
 export type GroupFlowNode = Node<GroupNodeData, 'sceneGroup'>
@@ -68,15 +70,19 @@ function GroupLabel({ group, sceneCount, handle }: { group: Group; sceneCount: n
 
 /** Area del gruppo: bordo grpln, raggio 14 (12 se annidato), etichetta a cavallo del bordo. */
 export const GroupNode = memo(function GroupNode({ data }: NodeProps<GroupFlowNode>) {
+  // Selezionato: fondo appena tinto dell'accento e bordo accento attenuato (il pieno resta per il rilascio).
+  const background = data.drop ? 'var(--acbg)' : data.groupSelected ? 'color-mix(in srgb, var(--ac) 9%, var(--grp))' : 'var(--grp)'
+  const borderColor = data.drop ? 'var(--ac)' : data.groupSelected ? 'color-mix(in srgb, var(--ac) 60%, transparent)' : (data.group.color ?? undefined)
   return (
     <div
       className="pointer-events-none relative border border-grpln"
+      data-group-selected={data.groupSelected ? '' : undefined}
       style={{
         width: data.width,
         height: data.height,
         borderRadius: data.nested ? 12 : 14,
-        background: data.drop ? 'var(--acbg)' : 'var(--grp)',
-        borderColor: data.drop ? 'var(--ac)' : (data.group.color ?? undefined),
+        background,
+        borderColor,
         opacity: data.dim ? 0.22 : 1
       }}
     >

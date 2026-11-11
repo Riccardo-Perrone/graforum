@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { StatusBar } from './components/shell/StatusBar'
 import { TitleBar } from './components/shell/TitleBar'
 import { newProject, openProject, saveProject } from './lib/fileActions'
+import { playFromScene, playFromStart } from './lib/playtest'
 import { useCommand } from './lib/shortcuts'
 import { ConfirmHost } from './components/ui/ConfirmDialog'
 import { dockBridge } from './dock/bridge'
@@ -65,6 +66,11 @@ export function App() {
   useCommand('toggleTheme', useUiStore.getState().toggleTheme)
   useCommand('documents', () => hasProject && dockBridge.openPanel?.('documents'))
   useCommand('dialogList', () => hasProject && dockBridge.openPanel?.('dialogs'))
+  // Comandi globali che non devono dipendere dalla scheda del grafo (che si può chiudere).
+  useCommand('playFromStart', () => hasProject && playFromStart())
+  useCommand('playFromHere', () => hasProject && playFromScene())
+  useCommand('toggleValidation', () => hasProject && dockBridge.togglePanel?.('validation'))
+  useCommand('crossProgress', () => hasProject && useUiStore.getState().openSheet({ kind: 'cross', tab: 'progress' }))
 
   return (
     <div className="flex h-full flex-col bg-bg text-tx">

@@ -21,7 +21,6 @@ import { IconButton, Kbd, TAG_META, TagChip, ToolbarButton, cn } from '../compon
 import { groupPath } from '../components/scene/SceneSheet'
 import { apply, options, useProject } from '../lib/entities'
 import { useKbd } from '../lib/commands'
-import { useCommand } from '../lib/shortcuts'
 import { useUiStore } from '../store/ui'
 
 // Playtest (7a): percorre la storia come un giocatore. Reale (gli oggetti raccolti si possiedono

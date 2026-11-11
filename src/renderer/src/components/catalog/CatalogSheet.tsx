@@ -11,9 +11,9 @@ import { GateButton } from '../logic/GateButton'
 import { UsageList } from '../logic/UsageList'
 import { confirmDialog } from '../ui/ConfirmDialog'
 import { Combobox } from '../ui/Combobox'
-import { AddButton, Button, NumberInput, Select, TextArea, TextInput, Toggle } from '../ui/form'
+import { AddButton, Button, NumberInput, TextArea, TextInput, Toggle } from '../ui/form'
 import { IconButton, cn } from '../ui/primitives'
-import { Empty, Row, Section, Sheet } from '../ui/Sheet'
+import { EditHint, Empty, Row, Section, Sheet } from '../ui/Sheet'
 import { ABILITIES, BonusList, CustomFields, ItemQtyList, KeyValue, ListInput, NamedList, modifier } from './fields'
 
 const CATEGORY: Record<CatalogType, string> = { npc: 'NPC', enemy: 'Enemy', item: 'Oggetto', quest: 'Quest' }
@@ -452,7 +452,7 @@ export function CatalogSheet({ type, id }: { type: CatalogType; id: string }) {
       height={880}
       onClose={close}
       bodyClassName="flex"
-      footer={<span>Le modifiche si salvano da sole · Ctrl+Z annulla</span>}
+      footer={<EditHint />}
     >
       {left && <div className="w-[360px] flex-none overflow-x-hidden overflow-y-auto border-r border-line p-5">{left}</div>}
       <div className="flex min-w-0 flex-1 flex-col overflow-y-auto px-5" data-text-scale>

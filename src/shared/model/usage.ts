@@ -9,7 +9,8 @@ export interface Owner {
   label: string
 }
 
-const DOC_LINK = /@\[[^\]]*\]\((\w+):([\w-]+)\)/g
+/** Link a un'entità nei documenti: `@[Testo visibile](tipo:id)`. Gruppi: 1 testo, 2 tipo, 3 id. */
+export const DOC_LINK = /@\[([^\]]*)\]\((\w+):([\w-]+)\)/g
 
 function owners(project: Project): [Owner, unknown][] {
   return [
@@ -73,7 +74,7 @@ export function buildUsageIndex(project: Project): Map<string, Owner[]> {
 
   for (const doc of project.documents) {
     const owner: Owner = { type: 'document', id: doc.id, label: doc.title }
-    for (const match of doc.markdown.matchAll(DOC_LINK)) if (match[2]) add(match[2], owner)
+    for (const match of doc.markdown.matchAll(DOC_LINK)) if (match[3]) add(match[3], owner)
   }
   return index
 }

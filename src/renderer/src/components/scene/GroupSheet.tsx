@@ -1,17 +1,17 @@
 import { useMemo } from 'react'
 import { FolderMinus, PanelLeft, PanelTop, Trash2 } from 'lucide-react'
 import type { Group } from '@shared/model'
+import { groupDescendants } from '@shared/engine'
 import { apply, options, useProject } from '../../lib/entities'
 import { ungroup } from '../../lib/sceneOps'
 import { dockBridge } from '../../dock/bridge'
 import { useUiStore } from '../../store/ui'
-import { groupDescendants } from '../graph/buildGraph'
 import { EntityChip } from '../logic/EntityChip'
 import { Combobox } from '../ui/Combobox'
 import { Field, TextArea, TextInput, Toggle } from '../ui/form'
 import { IconButton, cn } from '../ui/primitives'
 import { Empty, Section, Sheet, SheetHeader } from '../ui/Sheet'
-import { ENDING_PALETTE } from './SceneSheet'
+import { ENDING_COLORS } from '@shared/model'
 
 function updateGroup(id: string, label: string, recipe: (g: Group) => void) {
   apply(label, (d) => {
@@ -64,7 +64,7 @@ export function GroupSheet({ id }: { id: string }) {
 
 function GroupWindow({ group }: { group: Group }) {
   const p = useProject()
-  const descendants = useMemo(() => groupDescendants(p, group.id), [p, group.id])
+  const descendants = useMemo(() => groupDescendants(p.groups, group.id), [p, group.id])
   const count = p.scenes.filter((s) => s.groupId && descendants.has(s.groupId)).length
   return (
     <Sheet category="Gruppo" title={<GroupTitle group={group} />} subtitle={`${count} scene`} actions={useGroupActions(group, true)} width={760} height={760} onClose={() => useUiStore.getState().openSheet(null)}>
@@ -87,7 +87,7 @@ export function DockedGroupPanel({ id }: { id: string }) {
 
 function DockedGroupInner({ group }: { group: Group }) {
   const p = useProject()
-  const descendants = useMemo(() => groupDescendants(p, group.id), [p, group.id])
+  const descendants = useMemo(() => groupDescendants(p.groups, group.id), [p, group.id])
   const count = p.scenes.filter((s) => s.groupId && descendants.has(s.groupId)).length
   return (
     <div className="flex h-full min-h-0 flex-col bg-panel">
@@ -102,7 +102,7 @@ function DockedGroupInner({ group }: { group: Group }) {
 function GroupBody({ group }: { group: Group }) {
   const id = group.id
   const p = useProject()
-  const descendants = useMemo(() => groupDescendants(p, id), [p, id])
+  const descendants = useMemo(() => groupDescendants(p.groups, id), [p, id])
   const members = p.scenes.filter((s) => s.groupId && descendants.has(s.groupId))
   const memberIds = new Set(members.map((s) => s.id))
 
@@ -150,7 +150,7 @@ function GroupBody({ group }: { group: Group }) {
             <button type="button" onClick={() => updateGroup(id, 'Colore gruppo', (g) => void (g.color = null))} className={cn('h-6 rounded-md border border-line2 px-2 text-[11px]', !group.color && 'border-ac text-ac')}>
               Neutro
             </button>
-            {ENDING_PALETTE.map((c) => (
+            {ENDING_COLORS.map((c) => (
               <button key={c} type="button" onClick={() => updateGroup(id, 'Colore gruppo', (g) => void (g.color = c))} className={cn('size-6 rounded-md', group.color === c && 'shadow-[0_0_0_2px_var(--panel),0_0_0_4px_var(--tx)]')} style={{ background: c }} />
             ))}
           </div>

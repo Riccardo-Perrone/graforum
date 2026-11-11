@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { ArrowLeftRight, ArrowRight, ChevronDown, ChevronRight, CircleAlert, CircleCheck, Flag, ImageIcon, OctagonX, PanelLeft, PanelTop, Play, Swords, Trash2 } from 'lucide-react'
-import { newId, type Scene } from '@shared/model'
-import { decisivePath, validate } from '@shared/engine'
+import { ENDING_COLORS, makeEnding, makeLink, newId, type Scene } from '@shared/model'
+import { canLink, decisivePath, validateCached } from '@shared/engine'
 import { apply, createEntity, emptyGate, options, useProject } from '../../lib/entities'
 import { dockBridge } from '../../dock/bridge'
 import { useUiStore } from '../../store/ui'
@@ -9,16 +9,17 @@ import { ImagePicker, ImageThumb } from '../images/ImagePicker'
 import { EffectList } from '../logic/EffectEditor'
 import { EntityChip } from '../logic/EntityChip'
 import { ChecksButton, GateButton, newCheck } from '../logic/GateButton'
-import { canLink, deleteScene } from '../../lib/sceneOps'
+import { deleteScene, detachEncounter } from '../../lib/sceneOps'
+import { useKbd } from '../../lib/commands'
+import { playFromScene } from '../../lib/playtest'
 import { SkillCheckEditor } from '../logic/EffectEditor'
 import { Combobox } from '../ui/Combobox'
 import { AddButton, Field, NumberInput, Segmented, TextArea, TextInput, Toggle } from '../ui/form'
 import { DangerButton, IconButton, TAG_META, TagChip, cn } from '../ui/primitives'
-import { Empty, Row, Section, Sheet, SheetHeader } from '../ui/Sheet'
+import { EditHint, Empty, Row, Section, Sheet, SheetHeader } from '../ui/Sheet'
 import { EncounterEditor } from './EncounterEditor'
 import { CoverField, LabelsField } from './SceneLook'
 
-export const ENDING_PALETTE = ['#6fcf5b', '#44c4d9', '#8ea2ff', '#ad86f5', '#ef7fb8', '#e9c64a']
 
 export function updateScene(id: string, label: string, recipe: (s: Scene) => void, mergeKey?: string) {
   apply(label, (d) => recipe(d.scenes.find((s) => s.id === id)!), mergeKey)
@@ -34,7 +35,7 @@ function SidePanel({ scene }: { scene: Scene }) {
   const p = useProject()
   const [picking, setPicking] = useState(false)
   const ending = p.endings.find((e) => e.sceneId === scene.id)
-  const issues = useMemo(() => validate(p).filter((i) => i.sceneId === scene.id), [p, scene.id])
+  const issues = useMemo(() => validateCached(p).filter((i) => i.sceneId === scene.id), [p, scene.id])
   return (
     <div className="flex flex-col gap-4">
       <div className="relative">
@@ -76,7 +77,7 @@ function SidePanel({ scene }: { scene: Scene }) {
           sub="Etichetta e colore del finale"
           onChange={(v) =>
             apply('Scena finale', (d) => {
-              if (v) d.endings.push({ id: newId('ending'), sceneId: scene.id, label: 'Nuovo finale', color: ENDING_PALETTE[d.endings.length % ENDING_PALETTE.length]!, manualDecisive: [] })
+              if (v) d.endings.push(makeEnding(scene.id, d.endings.length))
               else d.endings = d.endings.filter((e) => e.sceneId !== scene.id)
             })
           }
@@ -85,7 +86,7 @@ function SidePanel({ scene }: { scene: Scene }) {
           <div className="flex flex-col gap-2 border-t border-line pt-3">
             <TextInput value={ending.label} placeholder="Es. Finale buono" onCommit={(label) => apply('Etichetta finale', (d) => void (d.endings.find((e) => e.id === ending.id)!.label = label))} />
             <div className="flex gap-1.5">
-              {ENDING_PALETTE.map((c) => (
+              {ENDING_COLORS.map((c) => (
                 <button
                   key={c}
                   type="button"
@@ -272,7 +273,7 @@ function EncountersSection({ scene, n }: { scene: Scene; n: number }) {
                 {enc.nature === 'repeatable' ? 'RIPETIBILE' : 'UNICO'}
               </span>
               {xp > 0 && <span className="font-mono text-[10.5px] text-tx2">{xp} PE</span>}
-              <IconButton icon={Trash2} size={13} title="Togli dalla scena" onClick={() => updateScene(scene.id, 'Rimuovi incontro', (s) => void (s.encounterIds = s.encounterIds.filter((x) => x !== id)))} />
+              <IconButton icon={Trash2} size={13} title="Togli dalla scena" onClick={() => void detachEncounter(scene.id, id)} />
             </Row>
             {open === id && <EncounterEditor encounter={enc} />}
           </div>
@@ -304,7 +305,7 @@ function LinksSection({ scene, n }: { scene: Scene; n: number }) {
           onChange={(to) =>
             to &&
             apply('Nuovo collegamento', (d) => {
-              if (canLink(d, scene.id, to)) d.links.push({ id: newId('link'), fromSceneId: scene.id, toSceneId: to, label: '', bidirectional: false, gate: emptyGate(), effects: [], checks: [] })
+              if (canLink(d, scene.id, to)) d.links.push(makeLink(scene.id, to))
             })
           }
         />
@@ -453,13 +454,14 @@ function Title({ scene }: { scene: Scene }) {
 /** `modal`: la scheda è nella finestra al centro (si può agganciare al dock); altrimenti è nel dock (si può aprire al centro). */
 function useSceneActions(scene: Scene, modal: boolean) {
   const ui = useUiStore()
+  const kbdHere = useKbd('playFromHere')
   const remove = async () => {
     const owners = await deleteScene(scene.id)
     if (owners) ui.showBlocked({ name: scene.title, owners })
   }
   const actions = (
     <>
-      <IconButton icon={Play} size={14} title="Parti da qui (Maiusc+F5)" onClick={() => ui.setView({ kind: 'playtest', startSceneId: scene.id })} />
+      <IconButton icon={Play} size={14} title={kbdHere ? `Parti da qui (${kbdHere})` : 'Parti da qui'} onClick={() => playFromScene(scene.id)} />
       {modal ? (
         <IconButton
           icon={PanelLeft}
@@ -508,7 +510,7 @@ function SceneWindow({ scene, onClose, groupPath }: { scene: Scene; onClose(): v
       width={1120}
       height={944}
       onClose={onClose}
-      footer={<span>Le modifiche si salvano da sole · Ctrl+Z annulla</span>}
+      footer={<EditHint />}
     >
       <SceneBody scene={scene} docked={false} deleteButton={deleteButton} />
       {dialog}

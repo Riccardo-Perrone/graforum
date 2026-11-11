@@ -3,6 +3,7 @@ import { Highlighter } from 'lucide-react'
 import type { EntityType } from '@shared/model'
 import { decisivePath, describeCondition, effectSites, entityName, leaves, progressRows, sourcesOf, type ProgressKind } from '@shared/engine'
 import { getProject, options, useProject } from '../../lib/entities'
+import { useKbd } from '../../lib/commands'
 import { openEntity, useUiStore, type CrossTab } from '../../store/ui'
 import { questScenes } from '../catalog/CatalogSheet'
 import { EntityChip } from '../logic/EntityChip'
@@ -235,6 +236,7 @@ function ProgressView({ scopeSceneId, onlyPath: initialOnlyPath }: { scopeSceneI
 }
 
 export function CrossViews({ tab, entityId, scopeSceneId, onlyPath }: { tab: CrossTab; entityId?: string | null; scopeSceneId?: string | null; onlyPath?: boolean }) {
+  const kbdProgress = useKbd('crossProgress')
   const p = useProject()
   const ui = useUiStore()
   const [ids, setIds] = useState<Record<string, string | null>>({
@@ -250,7 +252,7 @@ export function CrossViews({ tab, entityId, scopeSceneId, onlyPath }: { tab: Cro
     <Sheet
       category="Viste incrociate"
       title={TABS.find(([t]) => t === tab)![1]}
-      subtitle="Ctrl Maiusc V"
+      subtitle={tab === 'progress' ? kbdProgress : undefined}
       width={1320}
       height={900}
       onClose={() => ui.openSheet(null)}

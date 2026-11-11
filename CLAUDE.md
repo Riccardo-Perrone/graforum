@@ -10,4 +10,5 @@ Editor di grafi narrativi D&D (Electron + React + TypeScript). Prima di lavorare
 - Il pulsante di eliminazione di scene, battute e scelte usa `DangerButton` (`components/ui/primitives.tsx`) e chiede sempre conferma prima di cancellare.
 - Le modifiche al progetto passano solo da `useProjectStore().apply(...)` (annullabili).
 - Se tocchi il canvas (nodi, gruppi, trascinamento, selezione) esegui anche `npm run build && npm run smoke`: verifica che i gruppi interni restino selezionabili, collassabili e trascinabili. Aggiungi un controllo a `scripts/smoke.cjs` per ogni nuova interazione del grafo.
-- Dopo le modifiche: `npx tsc -p tsconfig.web.json --noEmit` e `npx vitest run` devono passare.
+- Non riscrivere ciò che esiste: la *Mappa dei file* in `docs/sviluppo.md` dice dove stanno gli aiuti condivisi (entità nuove con le fabbriche `make*` di `shared/model/factories.ts`, gerarchia dei gruppi in `shared/engine/groups.ts`, problemi del progetto con `validateCached`, menu a comparsa con `useClickOutside`, campi di ricerca con `SearchInput` + `matchesQuery`). La logica pura va in `src/shared` con un test.
+- Dopo le modifiche: `npx tsc -p tsconfig.web.json --noEmit` e `npx vitest run` devono passare. Un nuovo file di test va anche nella tabella *Test* di `docs/sviluppo.md`.

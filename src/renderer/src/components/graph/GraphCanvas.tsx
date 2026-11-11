@@ -15,18 +15,18 @@ import {
   type OnSelectionChangeParams
 } from '@xyflow/react'
 import { Magnet, Minus, Plus, Scan, Search, X } from 'lucide-react'
-import { newId } from '@shared/model'
-import { decisivePath, validate } from '@shared/engine'
+import { makeEncounter, makeLink, newId } from '@shared/model'
+import { canLink, decisivePath, groupDescendants, planMoveInto, selectedGroups, validateCached } from '@shared/engine'
 import { useKbd } from '../../lib/commands'
 import { usePanCursor } from '../../lib/cursors'
 import { useCommand } from '../../lib/shortcuts'
 import { emptyGate } from '../../lib/entities'
-import { assignToGroup, canLink, deleteLinks, deleteScenes } from '../../lib/sceneOps'
+import { deleteLinks, deleteScenes, moveIntoGroup } from '../../lib/sceneOps'
 import { useProjectStore } from '../../store/project'
 import { openEntity, useUiStore } from '../../store/ui'
 import { isConfirmOpen } from '../ui/ConfirmDialog'
 import { Kbd } from '../ui/primitives'
-import { SCENE_NODE_HEIGHT, buildGraph, groupDescendants, type FlowNode } from './buildGraph'
+import { SCENE_NODE_HEIGHT, buildGraph, type FlowNode } from './buildGraph'
 import { ContextMenu, type MenuState } from './ContextMenu'
 import { CollapsedGroupNode, GroupNode } from './GroupNode'
 import { LinkEdge, type LinkFlowEdge } from './LinkEdge'
@@ -58,7 +58,7 @@ export function GraphCanvas() {
   const [selEdges, setSelEdges] = useState<string[]>([])
 
   const graph = useMemo(() => buildGraph(project), [project])
-  const issues = useMemo(() => validate(project), [project])
+  const issues = validateCached(project)
   const path = useMemo(() => (pathEndingId ? decisivePath(project, pathEndingId) : null), [project, pathEndingId])
   const pathColor = project.endings.find((e) => e.id === pathEndingId)?.color ?? null
 
@@ -111,8 +111,8 @@ export function GraphCanvas() {
     if (!focus) return
     const n = flow.getNode(focus.sceneId)
     if (!n) return
-    const w = n.measured?.width ?? 200
-    const h = n.measured?.height ?? 136
+    const w = n.measured?.width ?? SCENE_NODE_WIDTH
+    const h = n.measured?.height ?? SCENE_NODE_HEIGHT
     void flow.setCenter(n.position.x + w / 2, n.position.y + h / 2, { zoom: Math.max(flow.getZoom(), 0.85), duration: 300 })
   }, [focus, flow])
 
@@ -129,18 +129,32 @@ export function GraphCanvas() {
     setNodes(next)
   }, [])
   const selectedIds = useUiStore((s) => s.selectedSceneIds)
-  useEffect(() => {
-    const selected = new Set(useUiStore.getState().selectedSceneIds)
-    commit(decorated.nodes.map((n) => (selected.has(n.id) ? { ...n, selected: true } : n)))
-  }, [decorated.nodes, commit])
-  useEffect(() => {
-    const selected = new Set(selectedIds)
-    commit(nodesRef.current.map((n) => (n.type === 'scene' && !!n.selected !== selected.has(n.id) ? { ...n, selected: selected.has(n.id) } : n)))
-  }, [selectedIds, commit])
+  const selectedCards = useUiStore((s) => s.selectedCardIds)
+  /**
+   * Riporta sui nodi la selezione dello store: scene e carte selezionate, e gruppi aperti "selezionati" perché tutte le loro
+   * scene lo sono (si colorano). Tocca solo i nodi che cambiano, per non ridisegnare il grafo a ogni clic.
+   */
+  const withSelection = useCallback(
+    (ns: FlowNode[]): FlowNode[] => {
+      const { selectedSceneIds, selectedCardIds } = useUiStore.getState()
+      const scenes = new Set(selectedSceneIds)
+      const cards = new Set(selectedCardIds)
+      const whole = selectedGroups(project, selectedSceneIds, selectedCardIds)
+      return ns.map((n) => {
+        if (n.type === 'scene') return !!n.selected !== scenes.has(n.id) ? { ...n, selected: scenes.has(n.id) } : n
+        if (n.type === 'collapsedGroup') return !!n.selected !== cards.has(n.id) ? { ...n, selected: cards.has(n.id) } : n
+        return !!n.data.groupSelected !== whole.has(n.id) ? { ...n, data: { ...n.data, groupSelected: whole.has(n.id) } } : n
+      })
+    },
+    [project]
+  )
+  useEffect(() => commit(withSelection(decorated.nodes)), [decorated.nodes, commit, withSelection])
+  useEffect(() => commit(withSelection(nodesRef.current)), [selectedIds, selectedCards, commit, withSelection])
 
   // Aggancio ai bordi e ai centri degli altri nodi (Alt lo sospende).
   const snapOn = useUiStore((s) => s.snap)
   const kbdSnap = useKbd('toggleSnap')
+  const kbdClearHighlight = useKbd('clearHighlight')
   const [guides, setGuides] = useState<Guide[]>([])
   const altDown = useRef(false)
   useEffect(() => {
@@ -159,7 +173,7 @@ export function GraphCanvas() {
   /** Nodi che si muovono insieme a un gruppo trascinato: scene, gruppi collassati e sottogruppi. */
   const groupMembers = useCallback(
     (groupId: string, ns: FlowNode[]) => {
-      const ids = groupDescendants(project, groupId)
+      const ids = groupDescendants(project.groups, groupId)
       return ns.filter((n) => {
         if (n.type === 'scene') return !!n.data.scene.groupId && ids.has(n.data.scene.groupId)
         return n.id !== groupId && ids.has(n.data.group.id)
@@ -168,17 +182,19 @@ export function GraphCanvas() {
     [project]
   )
 
-  /** Il gruppo di destinazione è quello della scena o un suo antenato? Salire di livello si fa solo con "Rimuovi dal gruppo". */
-  const isSameOrAncestor = useCallback(
-    (targetId: string, sceneGroupId: string | null) => {
-      let g = sceneGroupId ? project.groups.find((x) => x.id === sceneGroupId) : undefined
-      while (g) {
-        if (g.id === targetId) return true
-        g = g.parentId ? project.groups.find((x) => x.id === g!.parentId) : undefined
-      }
-      return false
-    },
-    [project.groups]
+  /**
+   * Cosa entrerebbe nel gruppo `targetId` rilasciando i nodi trascinati: le scene, i gruppi trascinati (area o carta) e i gruppi
+   * selezionati per intero, come per una scena singola. Esclude cicli e salite di livello (si sale solo con "Rimuovi dal gruppo").
+   */
+  const dropPlan = useCallback(
+    (targetId: string, dragged: FlowNode[]) =>
+      planMoveInto(
+        project,
+        targetId,
+        dragged.filter((n) => n.type === 'scene').map((n) => n.id),
+        dragged.filter((n) => n.type !== 'scene').map((n) => n.id)
+      ),
+    [project]
   )
 
   // Gruppo su cui si sta trattenendo il trascinamento: dopo una breve pausa il rilascio aggiunge le scene.
@@ -253,16 +269,17 @@ export function GraphCanvas() {
   /** Mentre si trascina: se il puntatore resta sull'area di un gruppo, dopo una pausa il gruppo si "arma". */
   const onNodeDrag = useCallback(
     (e: React.MouseEvent | MouseEvent | TouchEvent, _: FlowNode, dragged: FlowNode[]) => {
-      const scenes = dragged.filter((n): n is SceneFlowNode => n.type === 'scene')
       const pt = 'clientX' in e ? flow.screenToFlowPosition({ x: e.clientX, y: e.clientY }) : null
       let target: string | null = null
-      if (pt && scenes.length) {
+      if (pt && dragged.length) {
         let best = Infinity
         for (const n of graph.nodes) {
           if (n.type !== 'sceneGroup') continue
           const inside = pt.x >= n.position.x && pt.x <= n.position.x + n.data.width && pt.y >= n.position.y && pt.y <= n.position.y + n.data.height
           const area = n.data.width * n.data.height
-          if (inside && area < best && scenes.some((sc) => !isSameOrAncestor(n.id, sc.data.scene.groupId))) {
+          if (!inside || area >= best) continue
+          const plan = dropPlan(n.id, dragged)
+          if (plan.groupIds.length || plan.sceneIds.length) {
             target = n.id
             best = area
           }
@@ -280,7 +297,7 @@ export function GraphCanvas() {
         }, DROP_DWELL_MS)
       }
     },
-    [flow, graph.nodes, clearDwell, isSameOrAncestor]
+    [flow, graph.nodes, clearDwell, dropPlan]
   )
 
   const onNodeDragStop = useCallback(
@@ -294,7 +311,9 @@ export function GraphCanvas() {
       const moved = dragged.filter((n) => n.type === 'scene' || n.type === 'collapsedGroup')
       const groups = dragged.filter((n) => n.type === 'sceneGroup')
       const explicit = new Set(dragged.map((n) => n.id))
-      const label = groups.length ? 'Sposta gruppo' : moved.length > 1 ? 'Sposta scene' : 'Sposta scena'
+      const plan = target ? dropPlan(target, dragged) : null
+      const into = plan && (plan.groupIds.length || plan.sceneIds.length)
+      const label = into ? 'Sposta nel gruppo' : groups.length ? 'Sposta gruppo' : moved.length > 1 ? 'Sposta scene' : 'Sposta scena'
       apply(label, (draft) => {
         for (const n of moved) {
           const scene = draft.scenes.find((s) => s.id === n.id)
@@ -306,18 +325,15 @@ export function GraphCanvas() {
           if (!before) continue
           const dx = Math.round(n.position.x - before.position.x)
           const dy = Math.round(n.position.y - before.position.y)
-          const ids = new Set([n.id])
-          for (const g of draft.groups) if (g.parentId && ids.has(g.parentId)) ids.add(g.id)
+          // Tutti i livelli interni, qualunque sia l'ordine dei gruppi nell'elenco.
+          const ids = groupDescendants(draft.groups, n.id)
           for (const s of draft.scenes) if (s.groupId && ids.has(s.groupId) && !explicit.has(s.id)) s.position = { x: s.position.x + dx, y: s.position.y + dy }
         }
-        if (target) assignToGroup(
-            draft,
-            moved.filter((n): n is SceneFlowNode => n.type === 'scene' && !isSameOrAncestor(target, n.data.scene.groupId)).map((n) => n.id),
-            target
-          )
+        // Rilascio su un gruppo "armato": scene e gruppi entrano, i gruppi con tutto il loro contenuto.
+        if (target && plan && into) moveIntoGroup(draft, target, plan)
       })
     },
-    [apply, graph.nodes, clearDwell, isSameOrAncestor]
+    [apply, graph.nodes, clearDwell, dropPlan]
   )
 
   const onConnect = useCallback(
@@ -326,7 +342,7 @@ export function GraphCanvas() {
       apply('Nuovo collegamento', (draft) => {
         if (!canLink(draft, c.source, c.target)) return
         if (!draft.scenes.some((s) => s.id === c.source) || !draft.scenes.some((s) => s.id === c.target)) return
-        draft.links.push({ id: newId('link'), fromSceneId: c.source, toSceneId: c.target, label: '', bidirectional: false, gate: emptyGate(), effects: [], checks: [] })
+        draft.links.push(makeLink(c.source, c.target))
       })
     },
     [apply]
@@ -362,8 +378,12 @@ export function GraphCanvas() {
       const ids = nodesRef.current.filter((n) => n.type === 'scene' && n.selected).map((n) => n.id)
       const cur = useUiStore.getState().selectedSceneIds
       if (ids.length !== cur.length || ids.some((id, i) => id !== cur[i])) setSelection(ids)
-      // Un gruppo collassato selezionato da solo compare nel pannello a sinistra.
+      // Le carte dei gruppi collassati selezionate contano in "Raggruppa la selezione".
       const groups = nodesRef.current.filter((n) => n.type === 'collapsedGroup' && n.selected)
+      const cards = groups.map((n) => n.id)
+      const curCards = useUiStore.getState().selectedCardIds
+      if (cards.length !== curCards.length || cards.some((id, i) => id !== curCards[i])) useUiStore.getState().setSelectedCards(cards)
+      // Un gruppo collassato selezionato da solo compare nel pannello a sinistra.
       if (!ids.length && groups.length === 1 && useUiStore.getState().selectedGroupId !== groups[0]!.id) useUiStore.getState().setSelectedGroup(groups[0]!.id)
     },
     [setSelection]
@@ -385,16 +405,9 @@ export function GraphCanvas() {
         if (type === 'npc' && !s.npcs.some((n) => n.npcId === id)) s.npcs.push({ npcId: id, gate: emptyGate(), dialogs: [] })
         if (type === 'item') s.items.push({ id: newId('sceneItem'), itemId: id, quantity: 1, gate: emptyGate(), checks: [] })
         if (type === 'enemy') {
-          const encId = newId('encounter')
-          d.encounters.push({
-            id: encId,
-            name: `Incontro in ${s.title}`,
-            enemies: [{ enemyId: id, quantity: 1 }],
-            nature: 'unique',
-            rewards: { xp: 0, items: [] },
-            outcomes: { win: { target: null, effects: [] }, flee: { target: null, effects: [] }, defeat: { target: null, effects: [] } }
-          })
-          s.encounterIds.push(encId)
+          const encounter = makeEncounter(`Incontro in ${s.title}`, [id])
+          d.encounters.push(encounter)
+          s.encounterIds.push(encounter.id)
           s.tag = 'warning'
         }
       })
@@ -476,7 +489,7 @@ export function GraphCanvas() {
               <span>{highlight.label}</span>
               <span className="font-mono text-[10.5px] text-tx3">{highlight.hideOthers ? 'le altre sono nascoste' : 'le altre sono attenuate'}</span>
               <button type="button" onClick={() => setHighlight(null)} className="flex items-center gap-1 text-tx3 hover:text-tx">
-                <Kbd>Esc</Kbd>
+                {kbdClearHighlight && <Kbd>{kbdClearHighlight}</Kbd>}
                 <X size={12} />
               </button>
             </div>

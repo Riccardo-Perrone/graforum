@@ -1,20 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Search, X } from 'lucide-react'
 import { ENTITY_ICON, useProject } from '../../lib/entities'
 import { useKbd } from '../../lib/commands'
 import { useCommand } from '../../lib/shortcuts'
 import { openEntity, useUiStore } from '../../store/ui'
+import { dockBridge } from '../../dock/bridge'
 import { Kbd, TAG_META, cn } from '../ui/primitives'
+import { SearchInput } from '../ui/SearchInput'
+import { matchIndex } from '@shared/engine'
 import { search, type SearchResult } from './search'
 
 function Highlighted({ text, q }: { text: string; q: string }) {
-  const i = text.toLowerCase().indexOf(q.toLowerCase())
-  if (i < 0 || !q) return <>{text}</>
+  const i = matchIndex(text, q)
+  const n = q.trim().length
+  if (i < 0) return <>{text}</>
   return (
     <>
       {text.slice(0, i)}
-      <span className="bg-acbg text-tx">{text.slice(i, i + q.length)}</span>
-      {text.slice(i + q.length)}
+      <span className="bg-acbg text-tx">{text.slice(i, i + n)}</span>
+      {text.slice(i + n)}
     </>
   )
 }
@@ -34,9 +37,13 @@ export function SearchBox() {
   const kbd = useKbd('search')
 
   useCommand('search', () => {
-    input.current?.focus()
-    input.current?.select()
-    setOpen(true)
+    // Il campo sta nella barra del grafo: se davanti c'è un'altra scheda, prima si porta in vista il grafo.
+    dockBridge.openPanel?.('graph')
+    requestAnimationFrame(() => {
+      input.current?.focus()
+      input.current?.select()
+      setOpen(true)
+    })
   })
 
   // Le scene corrispondenti si evidenziano mentre si scrive.
@@ -89,35 +96,29 @@ export function SearchBox() {
 
   return (
     <div className="relative">
-      <label className={cn('flex h-7 w-[340px] items-center gap-2 rounded-md border bg-sunken pr-2 pl-2.5', open || q ? 'border-ac shadow-[0_0_0_3px_var(--acbg)]' : 'border-line2')}>
-        <Search size={14} className="text-tx3" />
-        <input
-          ref={input}
-          value={q}
-          onChange={(e) => {
-            setQ(e.target.value)
-            setActive(0)
-            setOpen(true)
-          }}
-          onFocus={() => setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 120)}
-          onKeyDown={(e) => {
-            if (e.key === 'ArrowDown') (e.preventDefault(), setActive((a) => Math.min(a + 1, ordered.length - 1)))
-            if (e.key === 'ArrowUp') (e.preventDefault(), setActive((a) => Math.max(a - 1, 0)))
-            if (e.key === 'Enter' && ordered[active]) pick(ordered[active]!, e.shiftKey)
-            if (e.key === 'Escape') (e.stopPropagation(), clear())
-          }}
-          placeholder="Cerca scene, NPC, oggetti, quest…"
-          className="min-w-0 flex-1 bg-transparent text-tx outline-none placeholder:text-tx3"
-        />
-        {q ? (
-          <button type="button" onClick={clear} className="text-tx3 hover:text-tx">
-            <X size={13} />
-          </button>
-        ) : (
-          kbd && <Kbd>{kbd}</Kbd>
-        )}
-      </label>
+      <SearchInput
+        className="h-7 w-[340px]"
+        inputRef={input}
+        value={q}
+        highlighted={open || !!q}
+        onChange={(v) => {
+          if (!v) return clear()
+          setQ(v)
+          setActive(0)
+          setOpen(true)
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 120)}
+        // Tasti del campo (non comandi): frecce, Invio e Esc muovono e chiudono l'elenco dei risultati.
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown') (e.preventDefault(), setActive((a) => Math.min(a + 1, ordered.length - 1)))
+          if (e.key === 'ArrowUp') (e.preventDefault(), setActive((a) => Math.max(a - 1, 0)))
+          if (e.key === 'Enter' && ordered[active]) pick(ordered[active]!, e.shiftKey)
+          if (e.key === 'Escape') (e.stopPropagation(), clear())
+        }}
+        placeholder="Cerca scene, NPC, oggetti, quest…"
+        trailing={kbd && <Kbd>{kbd}</Kbd>}
+      />
       {open && q.trim() && (
         <div className="absolute top-[34px] left-0 z-20 flex max-h-[520px] w-[420px] flex-col gap-0.5 overflow-y-auto rounded-[10px] border border-line2 bg-raised p-1.5 shadow-[var(--shadow)]">
           <div className="flex justify-between px-2 pt-1.5 pb-1 font-mono text-[10px] font-semibold tracking-[.08em] text-tx3">

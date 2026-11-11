@@ -13,7 +13,7 @@
     "test": "vitest run",
     "smoke": "electron scripts/smoke.cjs",
     "dist": "electron-vite build && electron-builder --win --publish never",
-    "release": "electron-vite build && electron-builder --win --publish always",
+    "release": "node scripts/release.cjs",
     "icon": "electron scripts/make-icon.cjs"
   },
   "build": {

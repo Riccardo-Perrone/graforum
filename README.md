@@ -17,7 +17,7 @@ Editor di **grafo narrativo per D&D** (Windows). Disegni l'avventura come un gra
 
 ## Installare
 
-1. Scarica `Graforum Setup <versione>.exe` dall'ultima [release](https://github.com/Riccardo-Perrone/graforum/releases/latest) ed eseguilo.
+1. Scarica `Graforum-Setup-<versione>.exe` dall'ultima [release](https://github.com/Riccardo-Perrone/graforum/releases/latest) ed eseguilo.
 2. Windows può mostrare l'avviso "editore sconosciuto" (l'installer non è firmato): scegli **Maggiori informazioni → Esegui comunque**.
 
 Dopo l'installazione l'app cerca da sola le nuove versioni all'avvio. Puoi anche farlo da **Impostazioni › Aggiornamenti** o dalla Home, e aggiornare con un pulsante. L'aggiornamento non tocca i tuoi progetti.
@@ -38,7 +38,7 @@ npm run typecheck  # tipi di main e renderer
 npm run build      # compila in out/
 npm run smoke      # prova nell'app vera, dopo `npm run build`
 npm run dist       # installer Windows (NSIS) in dist/, senza pubblicare
-npm run release    # come dist, ma pubblica il rilascio su GitHub (serve GH_TOKEN)
+npm run release    # come dist, ma pubblica il rilascio su GitHub (token da gh o GH_TOKEN)
 npm run icon       # rigenera build/icon.*
 ```
 
@@ -60,7 +60,7 @@ Ogni modifica al progetto passa da `useProjectStore().apply(...)`, che registra 
 ### Rilasciare una versione
 
 1. Aumenta `version` in `package.json` (es. `0.1.0` → `0.2.0`), poi commit e push.
-2. Imposta un token GitHub con permesso di scrittura sui contenuti della repo: in PowerShell `$env:GH_TOKEN = "…"` (mai nei file).
+2. Serve un accesso a GitHub: installa la [GitHub CLI](https://cli.github.com) (`winget install GitHub.cli`) e fai `gh auth login` una volta; lo script prende da solo il token con `gh auth token`. In alternativa imposta `GH_TOKEN` (permesso Contents: lettura e scrittura sulla repo): in PowerShell `$env:GH_TOKEN = "…"`.
 3. `npm run release`: costruisce l'installer e lo pubblica come release, con `latest.yml` e `.blockmap`. Le note scritte nella descrizione della release compaiono nell'app.
 4. Le app installate trovano la nuova versione e propongono l'aggiornamento.
 

@@ -1,7 +1,7 @@
 {
   "name": "graforum",
   "productName": "Graforum",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Editor di grafo narrativo D&D",
   "private": true,
   "main": "./out/main/index.js",
@@ -48,9 +48,17 @@
         "repo": "graforum",
         "releaseType": "release"
       }
+    ],
+    "electronLanguages": [
+      "it",
+      "en-US"
     ]
   },
   "dependencies": {
+    "electron-updater": "^6.8.11",
+    "fflate": "^0.8.3"
+  },
+  "devDependencies": {
     "@codemirror/autocomplete": "^6.20.4",
     "@codemirror/lang-markdown": "^6.5.2",
     "@codemirror/language": "^6.13.1",
@@ -59,13 +67,19 @@
     "@fontsource/geist-mono": "^5.3.0",
     "@fontsource/geist-sans": "^5.3.0",
     "@lezer/highlight": "^1.2.5",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
     "@xyflow/react": "^12.12.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "codemirror": "^6.0.2",
     "dockview-react": "^8.9.0",
-    "electron-updater": "^6.8.11",
-    "fflate": "^0.8.3",
+    "electron": "^44.9.0",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^6.0.0",
     "immer": "^11.1.21",
     "lucide-react": "^1.59.0",
     "marked": "^18.1.1",
@@ -73,21 +87,11 @@
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "tailwind-merge": "^3.7.0",
-    "zod": "^4.6.7",
-    "zustand": "^5.0.15"
-  },
-  "devDependencies": {
-    "@tailwindcss/vite": "^4.3.3",
-    "@types/node": "^26.6.5",
-    "@types/react": "^19.3.0",
-    "@types/react-dom": "^19.3.0",
-    "@vitejs/plugin-react": "^6.1.2",
-    "electron": "^44.9.0",
-    "electron-builder": "^26.15.3",
-    "electron-vite": "^6.0.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vite": "^8.3.4",
-    "vitest": "^5.0.5"
+    "vitest": "^5.0.5",
+    "zod": "^4.6.7",
+    "zustand": "^5.0.15"
   }
 }

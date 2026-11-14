@@ -24,7 +24,7 @@ Dopo l'installazione l'app cerca da sola le nuove versioni all'avvio. Puoi anche
 
 ## I tuoi progetti
 
-Ogni progetto è un unico file `.dng` (un archivio zip con `project.json` e le immagini) che salvi dove vuoi. Il salvataggio è atomico e tiene una copia `.bak`. Non c'è compatibilità con file di versioni precedenti dell'app. Un file più recente dell'app viene rifiutato senza essere modificato.
+Ogni progetto è un unico file `.foru` (un archivio zip con `project.json` e le immagini) che salvi dove vuoi. Il salvataggio è atomico e tiene una copia `.bak`. Non c'è compatibilità con file di versioni precedenti dell'app. Un file più recente dell'app viene rifiutato senza essere modificato.
 
 ## Sviluppo
 
@@ -49,7 +49,7 @@ npm run icon       # rigenera build/icon.*
 | `src/shared/model`             | Schemi Zod del modello (fonte di verità), id, indice "Usato in", lettura dei file              |
 | `src/shared/engine`            | Logica pura: condizioni, validazione, percorso decisivo, fonti dei requisiti                      |
 | `src/shared/export` · `sample` | Export JSON/HTML/PDF e import · progetto di esempio "La locanda del Corvo" (usato anche nei test) |
-| `src/main`                     | Processo principale Electron: finestra, file `.dng`, IPC, aggiornamenti                           |
+| `src/main`                     | Processo principale Electron: finestra, file `.foru`, IPC, aggiornamenti                           |
 | `src/preload`                  | API `window.graforum` esposta all'interfaccia                                                     |
 | `src/renderer`                 | Interfaccia React: shell, dock di schede (`dock/`), canvas (React Flow), cataloghi                |
 | `scripts`                      | `smoke.cjs` (prova nell'app vera), `screenshot.cjs`, `make-icon.cjs`                              |

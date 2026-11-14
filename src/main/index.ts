@@ -14,7 +14,7 @@ const OVERLAY: Record<Theme, Electron.TitleBarOverlayOptions> = {
   dark: { color: '#111419', symbolColor: '#a1a7b2', height: TITLE_BAR_HEIGHT },
   light: { color: '#ffffff', symbolColor: '#4b5260', height: TITLE_BAR_HEIGHT }
 }
-const DNG_FILTER = [{ name: 'Progetto Graforum', extensions: ['dng'] }]
+const PROJECT_FILTER = [{ name: 'Progetto Graforum', extensions: ['foru'] }]
 const IMAGE_EXT: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml' }
 
 const SOUND_EXT: Record<string, string> = {
@@ -29,7 +29,7 @@ const SOUND_EXT: Record<string, string> = {
   '.weba': 'audio/webm'
 }
 
-/** Immagini e suoni del progetto aperto: restano in memoria e finiscono nel .dng al salvataggio. */
+/** Immagini e suoni del progetto aperto: restano in memoria e finiscono nel .foru al salvataggio. */
 let images: ImageFiles = new Map()
 
 const APP_SCHEME = 'graforum-app'
@@ -109,7 +109,7 @@ const winOf = (e: Electron.IpcMainInvokeEvent) => BrowserWindow.fromWebContents(
 
 function registerIpc(): void {
   ipcMain.handle('project:open', async (event): Promise<FileResult> => {
-    const res = await dialog.showOpenDialog(winOf(event), { filters: DNG_FILTER, properties: ['openFile'] })
+    const res = await dialog.showOpenDialog(winOf(event), { filters: PROJECT_FILTER, properties: ['openFile'] })
     const path = res.filePaths[0]
     if (res.canceled || !path) return { ok: false, canceled: true }
     return open(path)
@@ -120,7 +120,7 @@ function registerIpc(): void {
   ipcMain.handle('project:save', async (event, project: Project, path: string | null): Promise<FileResult> => {
     let target = path
     if (!target) {
-      const res = await dialog.showSaveDialog(winOf(event), { filters: DNG_FILTER, defaultPath: `${project.name}.dng` })
+      const res = await dialog.showSaveDialog(winOf(event), { filters: PROJECT_FILTER, defaultPath: `${project.name}.foru` })
       if (res.canceled || !res.filePath) return { ok: false, canceled: true }
       target = res.filePath
     }

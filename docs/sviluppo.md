@@ -14,7 +14,7 @@ Descrive com'è fatta l'app **oggi**, per continuare a lavorarci senza rileggere
 | --- | --- |
 | `npm run dev` | App con ricarica a caldo (porta del server Vite, origine `localhost`) |
 | `npx tsc -p tsconfig.web.json --noEmit` · `npm run typecheck` | Tipi del renderer · tipi di main e renderer |
-| `npx vitest run` | Test (`src/**/*.test.ts`, elenco in [Test](#test)): modello, motore, export, file `.dng`, scorciatoie, annulla/ripeti, grafo, ricerca, dock |
+| `npx vitest run` | Test (`src/**/*.test.ts`, elenco in [Test](#test)): modello, motore, export, file `.foru`, scorciatoie, annulla/ripeti, grafo, ricerca, dock |
 | `npm run build && npm run smoke` | Prova nell'app vera (Electron su `out/`): grafo, gruppi, menu contestuale, dock, finestre modali, overflow a 260px |
 | `electron scripts/screenshot.cjs <cartella> <passi.json>` | Passi JS nella pagina + screenshot (`win: "popout"` fotografa una scheda staccata). Prima serve `npm run build` |
 | `npm run dist` · `npm run release` · `npm run icon` | Installer · installer + pubblicazione GitHub · rigenera `build/icon.*` |
@@ -29,7 +29,7 @@ Electron 44, electron-vite 6 + Vite 8, React 19, TypeScript 7 strict, Tailwind 4
 
 ```
 src/shared   Puro, senza Electron né React: modello Zod, motore (engine), export, progetto di esempio, tipi IPC
-src/main     Processo principale: finestra, file .dng, immagini, IPC, protocolli, aggiornamenti
+src/main     Processo principale: finestra, file .foru, immagini, IPC, protocolli, aggiornamenti
 src/preload  Espone window.graforum (tipo GraforumApi in shared/ipc.ts)
 src/renderer Interfaccia React
   store/       project.ts (progetto + annulla/ripeti), ui.ts (stato UI + Prefs), updates.ts
@@ -41,7 +41,7 @@ src/renderer Interfaccia React
 
 - **Alias:** `@shared` → `src/shared`, `@renderer` → `src/renderer/src`.
 - **Logica nel posto giusto:** valutazione, validazione, indici, descrizioni stanno in `src/shared/engine` con test; la UI le richiama senza duplicarle.
-- **Il main non conosce lo stato dell'app:** tiene solo le immagini del progetto aperto (in memoria, finiscono nel `.dng` al salvataggio) e risponde agli IPC.
+- **Il main non conosce lo stato dell'app:** tiene solo le immagini del progetto aperto (in memoria, finiscono nel `.foru` al salvataggio) e risponde agli IPC.
 
 ### Mappa dei file: dove sta cosa
 
@@ -91,7 +91,7 @@ Prima di scrivere un aiuto nuovo, cerca qui: quasi tutto ciò che serve in più 
 
 ### Modello e file
 - Schemi in `src/shared/model`; indice inverso "Usato in" (`buildUsageIndex`); `createEmptyProject`.
-- `.dng` = zip con `project.json` + `media/` + `sound/` (con le sottocartelle della libreria, anche vuote: `sound/Musica/Taverna/<id>.mp3`); scrittura atomica con `.bak`; autosalvataggio dopo 2 s dall'ultima modifica, solo se il progetto ha già un file. Recenti in localStorage (`graforum.recent`, 8 voci). Immagini lette come `graforum-img://lib/<id>`.
+- `.foru` = zip con `project.json` + `media/` + `sound/` (con le sottocartelle della libreria, anche vuote: `sound/Musica/Taverna/<id>.mp3`); scrittura atomica con `.bak`; autosalvataggio dopo 2 s dall'ultima modifica, solo se il progetto ha già un file. Recenti in localStorage (`graforum.recent`, 8 voci). Immagini lette come `graforum-img://lib/<id>`.
 - **Versioni:** `SCHEMA_VERSION` = 1. Nessuna migrazione e nessuna compatibilità con file vecchi (non ne esistono): si cambia lo schema liberamente. `loadProject` (`model/load.ts`) rifiuta solo i file più nuovi dell'app.
 
 ### Motore (`src/shared/engine`)
@@ -131,14 +131,14 @@ Nodi scena, archi "floating" con scostamento per andata/ritorno, gruppi annidati
 
 ### Catalogo, ricerca, viste, validazione, export
 - Catalogo con schede NPC/enemy/oggetto/quest (fonti collegate, "Usato in").
-- **Libreria** (scheda del dock, Ctrl+Maiusc+L): media (le immagini, `Project.images`) e suoni come in un esplora file (`screens/LibraryView.tsx`): albero di cartelle, percorso, tre viste, trascinamento di file e cartelle per spostarli, ricerca su tutte le cartelle, tag (ortogonali alle cartelle), caricamento, eliminazione bloccata se in uso. `Image.folder` / `Sound.folder` ("A/B") e `Project.imageFolders` / `soundFolders` (cartelle vuote) coincidono con le cartelle dentro il `.dng`: il percorso nel file lo calcola sempre `mediaEntryPath` (`shared/model/media.ts`, con le operazioni `createFolder`/`moveFolder`/`deleteFolder`). Le tessere mostrano **miniature** (400 px di larghezza, `main/thumbs.ts`, `graforum-img://thumb/<id>`): si creano al caricamento e restano nel `.dng` sotto `thumbs/<id>.jpg|png`; senza miniatura (immagine già piccola, svg) si usa l'originale. I byte originali restano comunque in memoria. L'albero delle cartelle ha in cima «Nuova cartella» e il pulsante per comprimerlo; la radice si chiama come la cartella vera (`media`, `sound`). Il **player** (`PlayerBar`) sta in fondo alla sola sezione Suoni e sotto i suoni di una scena; un solo suono suona alla volta. Ogni scena ha una sezione "Suoni" (`Scene.soundIds`) con ▶ su ogni suono. Comandi: `library`, `togglePlayback`, `stopPlayback`. I suoni stanno in memoria nel main insieme alle immagini (stessa mappa, id con prefisso `snd`) e il protocollo `graforum-img` risponde anche alle richieste `Range`, così la barra del player può scorrere. Perché l'audio parta servono il privilegio `stream` dello schema e `media-src graforum-img:` nella CSP di `index.html`: senza, l'elemento audio dà errore.
+- **Libreria** (scheda del dock, Ctrl+Maiusc+L): media (le immagini, `Project.images`) e suoni come in un esplora file (`screens/LibraryView.tsx`): albero di cartelle, percorso, tre viste, trascinamento di file e cartelle per spostarli, ricerca su tutte le cartelle, tag (ortogonali alle cartelle), caricamento, eliminazione bloccata se in uso. `Image.folder` / `Sound.folder` ("A/B") e `Project.imageFolders` / `soundFolders` (cartelle vuote) coincidono con le cartelle dentro il `.foru`: il percorso nel file lo calcola sempre `mediaEntryPath` (`shared/model/media.ts`, con le operazioni `createFolder`/`moveFolder`/`deleteFolder`). Le tessere mostrano **miniature** (400 px di larghezza, `main/thumbs.ts`, `graforum-img://thumb/<id>`): si creano al caricamento e restano nel `.foru` sotto `thumbs/<id>.jpg|png`; senza miniatura (immagine già piccola, svg) si usa l'originale. I byte originali restano comunque in memoria. L'albero delle cartelle ha in cima «Nuova cartella» e il pulsante per comprimerlo; la radice si chiama come la cartella vera (`media`, `sound`). Il **player** (`PlayerBar`) sta in fondo alla sola sezione Suoni e sotto i suoni di una scena; un solo suono suona alla volta. Ogni scena ha una sezione "Suoni" (`Scene.soundIds`) con ▶ su ogni suono. Comandi: `library`, `togglePlayback`, `stopPlayback`. I suoni stanno in memoria nel main insieme alle immagini (stessa mappa, id con prefisso `snd`) e il protocollo `graforum-img` risponde anche alle richieste `Range`, così la barra del player può scorrere. Perché l'audio parta servono il privilegio `stream` dello schema e `media-src graforum-img:` nella CSP di `index.html`: senza, l'elemento audio dà errore.
 - Ricerca Ctrl+K, filtri con viste salvate, selettore Percorso. Viste incrociate (`CrossViews`): dove serve un oggetto, quest nel grafo, NPC, enemy, avanzamento filtrabile con evidenziazione nel grafo.
 - Pannello validazione con correzioni rapide (`highlight` nello store attenua il resto del grafo).
 - Export JSON (senza dati solo-editor), HTML e PDF (senza immagini), zip con immagini; ambito tutto/gruppo/cataloghi; blocco per errori nell'ambito. Import JSON da File › Importa (passa da `loadProject`).
 
 ### Scorciatoie e impostazioni
 - `lib/commands.ts` (`COMMANDS`: gruppi File, Modifica, Vista, Grafo, Dialoghi, Playtest, Schermate, Layout) + `useCommand`/`useKbd`; pagina Impostazioni › Scorciatoie con registrazione dei tasti, conflitti e ripristino. Esc (`closeSheet`) chiude la finestra in cima; `confirmDialog()` sostituisce `window.confirm`.
-- Impostazioni del progetto (si salvano nel `.dng`): generale, abilità, tipi di oggetto, campi e condizioni custom, finali, flag. Impostazioni dell'app (localStorage): aspetto (tema, scala interfaccia, testo, snap), scorciatoie, aggiornamenti.
+- Impostazioni del progetto (si salvano nel `.foru`): generale, abilità, tipi di oggetto, campi e condizioni custom, finali, flag. Impostazioni dell'app (localStorage): aspetto (tema, scala interfaccia, testo, snap), scorciatoie, aggiornamenti.
 
 ### Aggiornamenti e rilascio
 `src/main/updater.ts` (`electron-updater`, rilasci GitHub di `Riccardo-Perrone/graforum`): il main tiene lo stato (`UpdateStatus`), il renderer lo rispecchia (`store/updates.ts`) nella scheda `UpdateCard` della Home e di Impostazioni › Aggiornamenti. Cerca → «Scarica e aggiorna» → «Riavvia e installa» (conferma se ci sono modifiche non salvate; altrimenti installa alla chiusura). `Prefs.autoCheckUpdates` cerca all'avvio senza scaricare. In sviluppo lo stato è `unsupported`. La procedura di rilascio è nel README.
@@ -174,7 +174,7 @@ Nodi scena, archi "floating" con scostamento per andata/ritorno, gruppi annidati
 | `shared/engine/encounters.test.ts` | Incontri resi orfani da eliminazione di scene o distacco; incontri in più scene; orfani preesistenti; avviso "Incontro senza scena"; chi blocca l'eliminazione; codici stabili dei problemi |
 | `shared/export/exporter.test.ts` | Ambito gruppo (scene e catalogo usato); blocco solo per errori nell'ambito; JSON senza dati solo-editor e reimportabile; HTML senza script |
 | `shared/model/media.test.ts` | Cartelle della libreria: percorso nel file, nomi validi, creazione annidata, sposta/rinomina (con file e sottocartelle), eliminazione che fa salire il contenuto |
-| `main/projectFile.test.ts` | `.dng`: cartelle della libreria (anche vuote) dentro lo zip, salva e riapre identico, solo immagini e suoni in libreria (`media/`, `sound/`), copia `.bak`, file senza `project.json`, file più nuovi |
+| `main/projectFile.test.ts` | `.foru`: cartelle della libreria (anche vuote) dentro lo zip, salva e riapre identico, solo immagini e suoni in libreria (`media/`, `sound/`), copia `.bak`, file senza `project.json`, file più nuovi |
 | `renderer/src/dock/layout.test.ts` | Layout salvati accettati o rifiutati (`isUsableLayout`); rimozione delle finestre staccate (`stripPopouts`) |
 | `renderer/src/lib/commands.test.ts` | Registro delle scorciatoie: id unici, combinazioni predefinite senza conflitti e nel formato giusto, personalizzazioni, conflitti per ambito, etichette in italiano, lettura dei tasti |
 | `renderer/src/lib/playtest.test.ts` | Playtest dall'inizio solo con scena di partenza (come il pulsante); dalla selezione o da una scena indicata |
@@ -182,7 +182,7 @@ Nodi scena, archi "floating" con scostamento per andata/ritorno, gruppi annidati
 | `renderer/src/components/graph/buildGraph.test.ts` | Nodi e archi dell'esempio; ingombro dei gruppi annidati; gruppi collassati (carta, scene nascoste, archi spostati sulla carta); `sceneTopLeft` |
 | `renderer/src/components/graph/snap.test.ts` | Aggancio a bordi e centri entro la soglia, guide, nessun aggancio oltre la soglia |
 | `renderer/src/components/search/search.test.ts` | Ricerca globale (titoli, cataloghi, scene da evidenziare, accenti distinti); filtri per gruppo con sottogruppi, tag, finali, problemi, entità usata, combinati; viste salvate nelle preferenze |
-| `scripts/smoke-library.cjs` (Electron, `npm run build && npx electron scripts/smoke-library.cjs`) | Libreria: player solo in Suoni; miniature (400 px, nel `.dng`); albero cartelle che si nasconde, con «Nuova cartella» in cima; mp3 caricato, letto e in avanzamento; cartelle (crea, annida, trascina file e cartelle, rinomina, nome non valido); tre viste; file salvato con le cartelle vere; caricamento di un suono dalla scena |
+| `scripts/smoke-library.cjs` (Electron, `npm run build && npx electron scripts/smoke-library.cjs`) | Libreria: player solo in Suoni; miniature (400 px, nel `.foru`); albero cartelle che si nasconde, con «Nuova cartella» in cima; mp3 caricato, letto e in avanzamento; cartelle (crea, annida, trascina file e cartelle, rinomina, nome non valido); tre viste; file salvato con le cartelle vere; caricamento di un suono dalla scena |
 | `scripts/smoke.cjs` (Electron) | Etichette dei gruppi cliccabili; collassa/espandi; trascinamento dei gruppi; gruppo colorato quando tutte le sue scene sono selezionate; Raggruppa che tiene la Locanda intera come sottogruppo; gruppo trascinato e rilasciato dentro un altro; cursore di spostamento; etichette, copertina e tag dalla scheda scena; Canc con conferma; menu contestuale con Esc; tasti del grafo fermi sotto una finestra modale; scena con incontro usato da una quest non eliminabile; Ctrl+K da un'altra scheda; gruppo nella scheda; dock (layout standard, ingrandisci, aree, salvataggio, menu Finestra e ⋯); dialoghi nella stessa scheda; scheda scena modale e a 260px |
 
 ## Limiti noti

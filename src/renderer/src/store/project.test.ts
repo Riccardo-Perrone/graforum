@@ -6,7 +6,7 @@ const store = () => useProjectStore.getState()
 const name = () => store().project!.name
 
 describe('progetto: modifiche, annulla e ripeti', () => {
-  beforeEach(() => store().load(createEmptyProject('Prova'), '/tmp/prova.dng'))
+  beforeEach(() => store().load(createEmptyProject('Prova'), '/tmp/prova.foru'))
 
   it('apply modifica il progetto senza toccare la versione precedente', () => {
     const before = store().project!
@@ -63,7 +63,7 @@ describe('progetto: modifiche, annulla e ripeti', () => {
     expect(isDirty(store())).toBe(false)
     store().apply('A', (d) => void (d.name = 'A'))
     expect(isDirty(store())).toBe(true)
-    store().markSaved('/tmp/prova.dng', store().revision)
+    store().markSaved('/tmp/prova.foru', store().revision)
     expect(isDirty(store())).toBe(false)
     store().undo()
     expect(isDirty(store())).toBe(true)

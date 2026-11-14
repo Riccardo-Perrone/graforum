@@ -6,7 +6,7 @@ import { strToU8, unzipSync, zipSync } from 'fflate'
 import { sampleProject } from '@shared/sample/locanda-del-corvo'
 import { readProjectFile, writeProjectFile, type ImageFiles } from './projectFile'
 
-describe('file .dng', () => {
+describe('file .foru', () => {
   let dir: string
   beforeEach(async () => {
     dir = await mkdtemp(join(tmpdir(), 'graforum-'))
@@ -14,13 +14,13 @@ describe('file .dng', () => {
   afterEach(() => rm(dir, { recursive: true, force: true }))
 
   it('salva e riapre il progetto identico', async () => {
-    const path = join(dir, 'corvo.dng')
+    const path = join(dir, 'corvo.foru')
     await writeProjectFile(path, sampleProject(), new Map())
     expect((await readProjectFile(path)).project).toEqual(sampleProject())
   })
 
   it('salva solo le immagini in libreria e crea la copia .bak', async () => {
-    const path = join(dir, 'corvo.dng')
+    const path = join(dir, 'corvo.foru')
     const project = { ...sampleProject(), images: [{ id: 'img_a', fileName: 'cantina.PNG', title: '', tags: [], mime: 'image/png', folder: '', width: null, height: null }] }
     const images: ImageFiles = new Map([
       ['img_a', { data: new Uint8Array([1, 2, 3]), fileName: 'cantina.PNG' }],
@@ -38,7 +38,7 @@ describe('file .dng', () => {
   })
 
   it('salva e riapre i suoni sotto sound/, scartando quelli fuori libreria', async () => {
-    const path = join(dir, 'corvo.dng')
+    const path = join(dir, 'corvo.foru')
     const project = { ...sampleProject(), sounds: [{ id: 'snd_a', fileName: 'taverna.MP3', title: 'Taverna', tags: ['musica'], mime: 'audio/mpeg', folder: '' }] }
     const files: ImageFiles = new Map([
       ['snd_a', { data: new Uint8Array([7, 8]), fileName: 'taverna.MP3' }],
@@ -53,7 +53,7 @@ describe('file .dng', () => {
   })
 
   it('le cartelle della libreria diventano cartelle nel file, anche quelle vuote, e si riaprono uguali', async () => {
-    const path = join(dir, 'corvo.dng')
+    const path = join(dir, 'corvo.foru')
     const project = {
       ...sampleProject(),
       sounds: [{ id: 'snd_a', fileName: 'taverna.mp3', title: 'Taverna', tags: [], mime: 'audio/mpeg', folder: 'Musica/Taverna' }],
@@ -77,7 +77,7 @@ describe('file .dng', () => {
   })
 
   it('salva e riapre le miniature delle immagini sotto thumbs/', async () => {
-    const path = join(dir, 'corvo.dng')
+    const path = join(dir, 'corvo.foru')
     const project = { ...sampleProject(), images: [{ id: 'img_a', fileName: 'x.png', title: '', tags: [], mime: 'image/png', folder: '', width: null, height: null }] }
     const files: ImageFiles = new Map([['img_a', { data: new Uint8Array([2]), fileName: 'x.png', thumb: { data: new Uint8Array([3, 3]), mime: 'image/png' as const } }]])
     await writeProjectFile(path, project, files)
@@ -86,21 +86,21 @@ describe('file .dng', () => {
     expect(reopened.images.get('img_a')?.thumb).toEqual({ data: new Uint8Array([3, 3]), mime: 'image/png' })
   })
 
-  it('un .dng senza miniature si apre e l immagine usa l originale', async () => {
-    const path = join(dir, 'corvo.dng')
+  it('un .foru senza miniature si apre e l immagine usa l originale', async () => {
+    const path = join(dir, 'corvo.foru')
     const project = { ...sampleProject(), images: [{ id: 'img_a', fileName: 'x.png', title: '', tags: [], mime: 'image/png', folder: '', width: null, height: null }] }
     await writeProjectFile(path, project, new Map([['img_a', { data: new Uint8Array([2]), fileName: 'x.png' }]]))
     expect((await readProjectFile(path)).images.get('img_a')?.thumb).toBeUndefined()
   })
 
   it('rifiuta un file senza project.json', async () => {
-    const path = join(dir, 'vuoto.dng')
+    const path = join(dir, 'vuoto.foru')
     await writeFile(path, zipSync({ 'altro.txt': strToU8('x') }))
     await expect(readProjectFile(path)).rejects.toThrow('project.json')
   })
 
   it('rifiuta un file salvato da una versione più recente', async () => {
-    const path = join(dir, 'futuro.dng')
+    const path = join(dir, 'futuro.foru')
     const project = { ...sampleProject(), schemaVersion: 999 }
     await writeFile(path, zipSync({ 'project.json': strToU8(JSON.stringify(project)) }))
     await expect(readProjectFile(path)).rejects.toThrow(/più recente/)

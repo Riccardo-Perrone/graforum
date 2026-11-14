@@ -414,7 +414,7 @@ function Updates() {
   const autoCheckUpdates = useUiStore((s) => s.autoCheckUpdates)
   const setPrefs = useUiStore((s) => s.setPrefs)
   return (
-    <Page title="Aggiornamenti" sub="Cerca nuove versioni di Graforum. I tuoi progetti (.dng) non vengono toccati dall’aggiornamento.">
+    <Page title="Aggiornamenti" sub="Cerca nuove versioni di Graforum. I tuoi progetti (.foru) non vengono toccati dall’aggiornamento.">
       <Section n={1} label="Versione">
         <UpdateCard className="max-w-[520px]" />
       </Section>
@@ -429,7 +429,7 @@ export function SettingsSheet({ page }: { page: SettingsPage }) {
   const p = useProject()
   const ui = useUiStore()
   return (
-    <Sheet category="Impostazioni" title={p.name} width={1200} height={860} onClose={() => ui.openSheet(null)} bodyClassName="flex" footer={<span>Le impostazioni del progetto si salvano nel file .dng</span>}>
+    <Sheet category="Impostazioni" title={p.name} width={1200} height={860} onClose={() => ui.openSheet(null)} bodyClassName="flex" footer={<span>Le impostazioni del progetto si salvano nel file .foru</span>}>
       <nav className="flex w-[240px] flex-none flex-col gap-0.5 border-r border-line p-3">
         {PAGES.map(([k, label]) => (
           <button key={k} type="button" onClick={() => ui.openSheet({ kind: 'settings', page: k })} className={cn('rounded-md px-2.5 py-1.5 text-left hover:bg-hover', page === k && 'bg-acbg text-ac')}>

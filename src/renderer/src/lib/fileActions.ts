@@ -43,12 +43,6 @@ function handle(result: FileResult): void {
   if (result.ok) {
     useProjectStore.getState().load(result.project, result.path)
     remember(result)
-    if (result.migrated) {
-      const { from, backup } = result.migrated
-      window.alert(`Il progetto era nel formato ${from} ed è stato aggiornato alla versione corrente.${backup ? `
-L’originale è conservato in:
-${backup}` : ''}`)
-    }
   } else if (!result.canceled) {
     window.alert(`Impossibile aprire il progetto:\n${result.error}`)
   }

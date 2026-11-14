@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Check, ImagePlus, Trash2, Upload } from 'lucide-react'
-import { imageUrl } from '@shared/ipc'
+import { imageUrl, thumbUrl } from '@shared/ipc'
 import { buildUsageIndex } from '@shared/model'
 import { matchesAny } from '@shared/engine'
 import { apply, useProject } from '../../lib/entities'
@@ -11,22 +11,23 @@ import { cn } from '../ui/primitives'
 import { SearchInput } from '../ui/SearchInput'
 
 /** Miniatura di un'immagine della libreria, con segnaposto a righe se manca. */
-export function ImageThumb({ id, className, rounded = 'rounded-lg', label }: { id: string | null; className?: string; rounded?: string; label?: string }) {
+export function ImageThumb({ id, className, rounded = 'rounded-lg', label, thumb }: { id: string | null; className?: string; rounded?: string; label?: string; thumb?: boolean }) {
   const p = useProject()
   const img = id ? p.images.find((i) => i.id === id) : undefined
   return (
     <div className={cn('stripes relative overflow-hidden border border-line2', rounded, className)}>
-      {img && <img src={imageUrl(img.id)} alt={img.title} className="absolute inset-0 size-full object-cover" draggable={false} />}
+      {img && <img src={thumb ? thumbUrl(img.id) : imageUrl(img.id)} alt={img.title} loading="lazy" className="absolute inset-0 size-full object-cover" draggable={false} />}
       {(label ?? img?.fileName) && <span className="absolute bottom-1.5 left-2 font-mono text-[9.5px] text-tx3 mix-blend-difference">{label ?? img?.fileName}</span>}
     </div>
   )
 }
 
-export async function importImages(): Promise<string[]> {
+/** Carica immagini nella libreria, nella cartella indicata, e restituisce gli id creati. */
+export async function importImages(folder = ''): Promise<string[]> {
   const imported = await window.graforum.importImages()
   if (imported.length === 0) return []
   apply('Carica immagini', (d) => {
-    for (const i of imported) d.images.push({ id: i.id, fileName: i.fileName, title: i.fileName.replace(/\.[^.]+$/, ''), tags: [], mime: i.mime, width: null, height: null })
+    for (const i of imported) d.images.push({ id: i.id, fileName: i.fileName, title: i.fileName.replace(/\.[^.]+$/, ''), tags: [], mime: i.mime, folder, width: null, height: null })
   })
   return imported.map((i) => i.id)
 }
@@ -101,7 +102,7 @@ export function ImagePicker({ value, onPick, onClose }: { value?: string | null;
               className="flex flex-col gap-1.5 text-left"
             >
               <span className={cn('relative block rounded-lg', selected === img.id && 'shadow-[0_0_0_2px_var(--ac)]')}>
-                <ImageThumb id={img.id} className="aspect-video" label="" />
+                <ImageThumb id={img.id} className="aspect-video" label="" thumb />
                 {selected === img.id && (
                   <span className="absolute top-1.5 right-1.5 grid size-5 place-items-center rounded-full bg-ac text-btntx">
                     <Check size={12} />

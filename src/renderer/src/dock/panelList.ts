@@ -8,7 +8,8 @@ export const PANEL_TITLES: Record<PanelId, string> = {
   validation: 'Validazione',
   playtest: 'Playtest',
   dialogs: 'Dialoghi',
-  documents: 'Documenti'
+  documents: 'Documenti',
+  library: 'Libreria'
 }
 
 /** Schede elencate nel menu Finestra e nel menu ⋯ dei gruppi. */
@@ -25,7 +26,8 @@ export const PANEL_AREA: Record<PanelId, 'center' | 'left' | 'right' | 'bottom'>
   validation: 'bottom',
   playtest: 'center',
   dialogs: 'center',
-  documents: 'center'
+  documents: 'center',
+  library: 'center'
 }
 
 /** Dimensione iniziale (px) dell'area quando una scheda ci viene aperta. */

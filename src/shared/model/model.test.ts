@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Project, buildUsageIndex, createEmptyProject, newId } from './index'
+import { existingIds, findRefs } from '../engine/refs'
 import { sampleProject } from '../sample/locanda-del-corvo'
 
 describe('modello', () => {
@@ -28,5 +29,15 @@ describe('modello', () => {
     expect(usedBy('itm_chiave')).toEqual(['dlg_benvenuto', 'lnk_sala_cantina'])
     expect(usedBy('dlg_benvenuto')).toEqual(['qst_cantina', 'scn_sala'])
     expect(usedBy('enc_ratti')).toEqual(['qst_cantina', 'scn_cantina'])
+  })
+
+  it('un suono associato a una scena compare in "Usato in" e nei riferimenti', () => {
+    const p = sampleProject()
+    p.sounds.push({ id: 'snd_taverna', fileName: 'taverna.mp3', title: 'Taverna', tags: [], mime: 'audio/mpeg', folder: '' })
+    p.scenes[0]!.soundIds.push('snd_taverna')
+    expect((buildUsageIndex(p).get('snd_taverna') ?? []).map((o) => o.id)).toEqual([p.scenes[0]!.id])
+    expect(findRefs(p.scenes[0]).filter((r) => r.type === 'sound').map((r) => r.id)).toEqual(['snd_taverna'])
+    expect(existingIds(p).sound.has('snd_taverna')).toBe(true)
+    expect(newId('sound')).toMatch(/^snd_/)
   })
 })

@@ -3,10 +3,11 @@ import { basename, extname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { app, BrowserWindow, dialog, ipcMain, net, protocol, shell } from 'electron'
 import { strToU8, zipSync } from 'fflate'
-import type { ExportFile, FileResult, ImportedImage, Theme } from '@shared/ipc'
+import type { ExportFile, FileResult, ImportedImage, ImportedSound, MediaRef, Theme } from '@shared/ipc'
 import { newId, type Project } from '@shared/model'
 import { registerUpdater } from './updater'
-import { backupBeforeMigration, imageEntryName, readProjectFile, writeProjectFile, type ImageFiles } from './projectFile'
+import { makeThumb } from './thumbs'
+import { imageEntryName, readProjectFile, soundEntryName, writeProjectFile, type ImageFiles } from './projectFile'
 
 const TITLE_BAR_HEIGHT = 36
 const OVERLAY: Record<Theme, Electron.TitleBarOverlayOptions> = {
@@ -16,7 +17,19 @@ const OVERLAY: Record<Theme, Electron.TitleBarOverlayOptions> = {
 const DNG_FILTER = [{ name: 'Progetto Graforum', extensions: ['dng'] }]
 const IMAGE_EXT: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml' }
 
-/** Immagini del progetto aperto: restano in memoria e finiscono nel .dng al salvataggio. */
+const SOUND_EXT: Record<string, string> = {
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.ogg': 'audio/ogg',
+  '.oga': 'audio/ogg',
+  '.opus': 'audio/ogg',
+  '.m4a': 'audio/mp4',
+  '.aac': 'audio/aac',
+  '.flac': 'audio/flac',
+  '.weba': 'audio/webm'
+}
+
+/** Immagini e suoni del progetto aperto: restano in memoria e finiscono nel .dng al salvataggio. */
 let images: ImageFiles = new Map()
 
 const APP_SCHEME = 'graforum-app'
@@ -24,7 +37,8 @@ const RENDERER_DIR = join(__dirname, '../renderer')
 const DEV_URL = process.env['ELECTRON_RENDERER_URL']
 
 protocol.registerSchemesAsPrivileged([
-  { scheme: 'graforum-img', privileges: { standard: true, secure: true, supportFetchAPI: true } },
+  // stream: serve al lettore audio per riprodurre e scorrere i file con le richieste Range.
+  { scheme: 'graforum-img', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
   // L'app compilata si carica da qui e non da file://: le schede staccate (window.open) richiedono un'origine uguale a quella della pagina.
   { scheme: APP_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true } }
 ])
@@ -85,9 +99,7 @@ async function open(path: string): Promise<FileResult> {
     const result = await readProjectFile(path)
     images = result.images
     app.addRecentDocument(path)
-    // File di una versione precedente: ne resta una copia originale prima che il salvataggio lo riscriva.
-    const migrated = result.migratedFrom === null ? undefined : { from: result.migratedFrom, backup: await backupBeforeMigration(path, result.migratedFrom) }
-    return { ok: true, path, project: result.project, migrated }
+    return { ok: true, path, project: result.project }
   } catch (err) {
     return errorResult(err)
   }
@@ -138,6 +150,26 @@ function registerIpc(): void {
       if (!mime) continue
       const id = newId('image')
       const fileName = basename(path)
+      const data = new Uint8Array(await readFile(path))
+      images.set(id, { data, fileName, thumb: makeThumb(data, fileName) ?? undefined })
+      out.push({ id, fileName, mime })
+    }
+    return out
+  })
+
+  ipcMain.handle('sounds:import', async (event): Promise<ImportedSound[]> => {
+    const res = await dialog.showOpenDialog(winOf(event), {
+      title: 'Carica suoni nella libreria',
+      filters: [{ name: 'Suoni', extensions: Object.keys(SOUND_EXT).map((e) => e.slice(1)) }],
+      properties: ['openFile', 'multiSelections']
+    })
+    if (res.canceled) return []
+    const out: ImportedSound[] = []
+    for (const path of res.filePaths) {
+      const mime = SOUND_EXT[extname(path).toLowerCase()]
+      if (!mime) continue
+      const id = newId('sound')
+      const fileName = basename(path)
       images.set(id, { data: new Uint8Array(await readFile(path)), fileName })
       out.push({ id, fileName, mime })
     }
@@ -151,14 +183,14 @@ function registerIpc(): void {
     return res.filePath
   })
 
-  ipcMain.handle('export:zip', async (event, defaultName: string, files: Record<string, string>, imageIds: { id: string; fileName: string }[]): Promise<string | null> => {
+  ipcMain.handle('export:zip', async (event, defaultName: string, files: Record<string, string>, media: MediaRef[]): Promise<string | null> => {
     const res = await dialog.showSaveDialog(winOf(event), { defaultPath: defaultName, filters: [{ name: 'Archivio zip', extensions: ['zip'] }] })
     if (res.canceled || !res.filePath) return null
     const entries: Record<string, Uint8Array> = {}
     for (const [name, text] of Object.entries(files)) entries[name] = strToU8(text)
-    for (const img of imageIds) {
-      const file = images.get(img.id)
-      if (file) entries[imageEntryName(img.id, img.fileName)] = file.data
+    for (const m of media) {
+      const file = images.get(m.id)
+      if (file) entries[(m.kind === 'sound' ? soundEntryName : imageEntryName)(m)] = file.data
     }
     await writeFile(res.filePath, zipSync(entries, { level: 6 }))
     return res.filePath
@@ -199,11 +231,29 @@ function registerIpc(): void {
 app.whenReady().then(() => {
   // Le immagini della libreria si leggono come graforum-img://lib/<id> (il percorso conserva le maiuscole).
   protocol.handle('graforum-img', (request) => {
-    const id = decodeURIComponent(new URL(request.url).pathname.slice(1))
+    const url = new URL(request.url)
+    const id = decodeURIComponent(url.pathname.slice(1))
     const file = images.get(id)
     if (!file) return new Response(null, { status: 404 })
-    const mime = IMAGE_EXT[extname(file.fileName).toLowerCase()] ?? 'application/octet-stream'
-    return new Response(Buffer.from(file.data), { headers: { 'content-type': mime } })
+    // graforum-img://thumb/<id>: miniatura; se non c'è (immagine già piccola, svg) si serve l'originale.
+    if (url.host === 'thumb') {
+      if (file.thumb) return new Response(Buffer.from(file.thumb.data), { headers: { 'content-type': file.thumb.mime, 'cache-control': 'max-age=3600' } })
+    }
+    const ext = extname(file.fileName).toLowerCase()
+    const mime = IMAGE_EXT[ext] ?? SOUND_EXT[ext] ?? 'application/octet-stream'
+    const total = file.data.byteLength
+    // I suoni si scorrono con la barra del player: serve rispondere alle richieste con Range.
+    const range = /^bytes=(\d*)-(\d*)$/.exec(request.headers.get('range') ?? '')
+    if (range && (range[1] || range[2])) {
+      const start = range[1] ? Number(range[1]) : Math.max(0, total - Number(range[2]))
+      const end = range[1] && range[2] ? Math.min(Number(range[2]), total - 1) : total - 1
+      if (start > end || start >= total) return new Response(null, { status: 416, headers: { 'content-range': `bytes */${total}` } })
+      return new Response(Buffer.from(file.data.subarray(start, end + 1)), {
+        status: 206,
+        headers: { 'content-type': mime, 'accept-ranges': 'bytes', 'content-range': `bytes ${start}-${end}/${total}`, 'content-length': String(end - start + 1) }
+      })
+    }
+    return new Response(Buffer.from(file.data), { headers: { 'content-type': mime, 'accept-ranges': 'bytes', 'content-length': String(total) } })
   })
   // Interfaccia compilata: i file di out/renderer si servono dal protocollo dell'app (con un controllo che non si esca dalla cartella).
   protocol.handle(APP_SCHEME, async (request) => {

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Braces, FileText, FolderOpen, Globe, OctagonX } from 'lucide-react'
 import { blockingIssues, exportHtml, exportJson, scopeProject, type ExportOptions, type ExportScope } from '@shared/export/exporter'
+import type { MediaRef } from '@shared/ipc'
 import { options, useProject } from '../../lib/entities'
 import { useProjectStore } from '../../store/project'
 import { openEntity, useUiStore } from '../../store/ui'
@@ -50,15 +51,17 @@ export function ExportSheet() {
   }, [p, format, scope.kind, groupId, opts])
 
   const base = `${slug(p.name)}${scope.kind === 'group' ? `-${slug(p.groups.find((g) => g.id === groupId)?.name ?? 'gruppo')}` : scope.kind === 'catalogs' ? '-cataloghi' : ''}`
-  const images = scoped.images.map((i) => ({ id: i.id, fileName: i.fileName }))
+  const images: MediaRef[] = scoped.images.map((i) => ({ id: i.id, fileName: i.fileName, folder: i.folder }))
+  // Anche i suoni viaggiano nel pacchetto del JSON (l'HTML non li usa).
+  const jsonMedia: MediaRef[] = [...images, ...scoped.sounds.map((s): MediaRef => ({ id: s.id, fileName: s.fileName, folder: s.folder, kind: 'sound' }))]
 
   const run = async () => {
     let path: string | null = null
     if (format === 'json') {
       const json = exportJson(p, scope, opts)
       path =
-        withImages && images.length
-          ? await window.graforum.exportZip(`${base}.zip`, { [`${base}.json`]: json }, images)
+        withImages && jsonMedia.length
+          ? await window.graforum.exportZip(`${base}.zip`, { [`${base}.json`]: json }, jsonMedia)
           : await window.graforum.exportFile({ defaultName: `${base}.json`, filters: [{ name: 'JSON', extensions: ['json'] }], content: json })
     } else if (format === 'html') {
       const html = exportHtml(p, scope, opts, withImages)
@@ -116,7 +119,7 @@ export function ExportSheet() {
         </Section>
         <Section n={3} label="Opzioni">
           {scopeKind === 'group' && <Toggle checked={opts.includeUsedCatalog} onChange={(v) => setOpts({ ...opts, includeUsedCatalog: v })} label="Includi le voci di catalogo usate dal gruppo" />}
-          {format !== 'pdf' && <Toggle checked={withImages} onChange={setWithImages} label="Copia le immagini in una cartella accanto" sub={`Pacchetto .zip con ${images.length} immagini`} />}
+          {format !== 'pdf' && <Toggle checked={withImages} onChange={setWithImages} label="Copia le immagini in una cartella accanto" sub={`Pacchetto .zip con ${images.length} immagini${format === 'json' ? ` e ${scoped.sounds.length} suoni` : ''}`} />}
           <Toggle checked={opts.includeDocuments} onChange={(v) => setOpts({ ...opts, includeDocuments: v })} label="Includi le note dell’autore (documenti di progetto)" />
           {format === 'pdf' && <span className="text-[12px] text-tx3">Il PDF contiene i testi e le schede; le immagini restano nell’export HTML o JSON.</span>}
         </Section>

@@ -1,11 +1,12 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { ArrowLeftRight, ArrowRight, ChevronDown, ChevronRight, CircleAlert, CircleCheck, Flag, ImageIcon, OctagonX, PanelLeft, PanelTop, Play, Swords, Trash2 } from 'lucide-react'
+import { ArrowLeftRight, ArrowRight, ChevronDown, ChevronRight, CircleAlert, CircleCheck, Flag, ImageIcon, Music, OctagonX, PanelLeft, PanelTop, Play, Swords, Trash2, Upload } from 'lucide-react'
 import { ENDING_COLORS, makeEnding, makeLink, newId, type Scene } from '@shared/model'
 import { canLink, decisivePath, validateCached } from '@shared/engine'
 import { apply, createEntity, emptyGate, options, useProject } from '../../lib/entities'
 import { dockBridge } from '../../dock/bridge'
 import { useUiStore } from '../../store/ui'
 import { ImagePicker, ImageThumb } from '../images/ImagePicker'
+import { PlayButton, PlayerBar, importSounds } from '../sounds/SoundPlayer'
 import { EffectList } from '../logic/EffectEditor'
 import { EntityChip } from '../logic/EntityChip'
 import { ChecksButton, GateButton, newCheck } from '../logic/GateButton'
@@ -14,7 +15,7 @@ import { useKbd } from '../../lib/commands'
 import { playFromScene } from '../../lib/playtest'
 import { SkillCheckEditor } from '../logic/EffectEditor'
 import { Combobox } from '../ui/Combobox'
-import { AddButton, Field, NumberInput, Segmented, TextArea, TextInput, Toggle } from '../ui/form'
+import { AddButton, Button, Field, NumberInput, Segmented, TextArea, TextInput, Toggle } from '../ui/form'
 import { DangerButton, IconButton, TAG_META, TagChip, cn } from '../ui/primitives'
 import { EditHint, Empty, Row, Section, Sheet, SheetHeader } from '../ui/Sheet'
 import { EncounterEditor } from './EncounterEditor'
@@ -185,6 +186,52 @@ function NpcSection({ scene, n }: { scene: Scene; n: number }) {
           </Row>
         )
       })}
+    </Section>
+  )
+}
+
+/** Suoni della libreria associati alla scena, con il player per ascoltarli. */
+function SoundsSection({ scene, n }: { scene: Scene; n: number }) {
+  const p = useProject()
+  const add = (soundId: string) => updateScene(scene.id, 'Aggiungi suono', (s) => void (s.soundIds.includes(soundId) || s.soundIds.push(soundId)))
+  return (
+    <Section
+      n={n}
+      label="Suoni"
+      right={
+        <div className="flex min-w-0 items-center gap-1.5">
+          <Combobox
+            className="h-6 w-[104px] max-w-full text-[11.5px]"
+            value={null}
+            placeholder="+ Aggiungi"
+            options={options(p, 'sound', (id) => !scene.soundIds.includes(id))}
+            onChange={(id) => id && add(id)}
+          />
+          <Button
+            className="h-6 px-2 text-[11.5px]"
+            title="Carica un file audio dal computer: finisce nella libreria e viene associato a questa scena"
+            onClick={async () => {
+              for (const id of await importSounds()) add(id)
+            }}
+          >
+            <Upload size={12} />
+            Carica
+          </Button>
+        </div>
+      }
+    >
+      {scene.soundIds.length === 0 && <Empty>Nessun suono: musica o ambiente da ascoltare per questa scena.</Empty>}
+      {scene.soundIds.map((id, i) => {
+        const sound = p.sounds.find((s) => s.id === id)
+        return (
+          <Row key={id} tone={sound ? undefined : 'warn'}>
+            {sound ? <PlayButton id={id} /> : <Music size={13} className="text-warn" />}
+            <span className="min-w-0 flex-1 basis-1 truncate">{sound ? sound.title || sound.fileName : 'Suono eliminato'}</span>
+            <IconButton icon={Trash2} size={13} title="Togli dalla scena" onClick={() => updateScene(scene.id, 'Rimuovi suono', (s) => void s.soundIds.splice(i, 1))} />
+          </Row>
+        )
+      })}
+      {scene.soundIds.length > 0 && <PlayerBar className="mt-1" />}
     </Section>
   )
 }
@@ -396,6 +443,7 @@ function SceneBody({ scene, docked, deleteButton }: { scene: Scene; docked: bool
       <Section n={++n} label="Descrizione">
         <TextArea rows={docked ? 5 : 4} value={scene.description} onCommit={(description) => updateScene(scene.id, 'Descrizione scena', (s) => void (s.description = description))} />
       </Section>
+      <SoundsSection scene={scene} n={++n} />
       <NpcSection scene={scene} n={++n} />
       <ItemsSection scene={scene} n={++n} />
       <EncountersSection scene={scene} n={++n} />

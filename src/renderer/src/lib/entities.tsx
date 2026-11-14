@@ -1,4 +1,4 @@
-import { BookText, Flag, KeyRound, MessagesSquare, Package, ScrollText, Skull, Swords, UserRound, Waypoints } from 'lucide-react'
+import { BookText, Flag, KeyRound, MessagesSquare, Music, Package, ScrollText, Skull, Swords, UserRound, Waypoints } from 'lucide-react'
 import { Enemy, Flag as FlagSchema, Item, Npc, Quest, makeEncounter, newId, type EntityType, type Gate, type Project } from '@shared/model'
 import { entityName } from '@shared/engine'
 import type { ComboOption } from '../components/ui/Combobox'
@@ -64,6 +64,8 @@ export function options(p: Project, type: EntityType, filter?: (id: string) => b
         return p.groups.map((g) => ({ id: g.id, label: g.name, sub: g.parentId ? entityName(p, 'group', g.parentId) : undefined }))
       case 'image':
         return p.images.map((i) => ({ id: i.id, label: i.title || i.fileName, sub: i.fileName }))
+      case 'sound':
+        return p.sounds.map((s) => ({ id: s.id, label: s.title || s.fileName, sub: s.fileName, icon: <Music size={12} className="text-tx3" /> }))
       case 'conditionType':
         return p.settings.conditionTypes.map((t) => ({ id: t.id, label: t.name }))
       case 'document':

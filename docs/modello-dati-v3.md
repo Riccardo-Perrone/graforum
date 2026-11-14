@@ -28,7 +28,7 @@ Il codice di riferimento è `src/shared/model/` (schemi Zod): questo documento n
 ## 1. Identificatori e riferimenti
 
 - Ogni entità ha un `id` stabile: prefisso di tipo + 10 caratteri casuali (es. `scn_V1StGXR8Z5`). Non cambia mai, nemmeno rinominando.
-- Prefissi: `scn` scena, `lnk` collegamento, `grp` gruppo, `end` finale, `prj` progetto, `lbl` etichetta di scena, `npc`, `eny` enemy, `itm` oggetto, `qst` quest, `stp` step, `dlg` dialogo, `dln` battuta, `dch` scelta, `enc` incontro, `img` immagine, `flg` flag, `chk` skill check, `sit` oggetto in scena, `doc` documento, `pre` preset, `ctp` tipo di condizione custom, `skl` abilità, `ityp` tipo di oggetto, `cfd` campo custom.
+- Prefissi: `scn` scena, `lnk` collegamento, `grp` gruppo, `end` finale, `prj` progetto, `lbl` etichetta di scena, `npc`, `eny` enemy, `itm` oggetto, `qst` quest, `stp` step, `dlg` dialogo, `dln` battuta, `dch` scelta, `enc` incontro, `img` immagine, `snd` suono, `flg` flag, `chk` skill check, `sit` oggetto in scena, `doc` documento, `pre` preset, `ctp` tipo di condizione custom, `skl` abilità, `ityp` tipo di oggetto, `cfd` campo custom.
 - Un riferimento generico è `{ type, id }` (es. `{ "type": "scene", "id": "scn_…" }`).
 - **Eliminazione:** bloccata se l'entità è usata; si mostra l'elenco "Usato in". Eliminando una scena spariscono anche i suoi collegamenti, il suo finale e gli incontri che non stanno in altre scene; se uno di questi è usato altrove l'eliminazione si blocca.
 
@@ -36,17 +36,17 @@ Il codice di riferimento è `src/shared/model/` (schemi Zod): questo documento n
 
 | Campo | Tipo | Note |
 | --- | --- | --- |
-| schemaVersion | numero | Per le migrazioni |
+| schemaVersion | numero | Numero del formato; un file più recente dell'app si rifiuta |
 | id, name, description | testo | |
 | startSceneId | rif. scena | Obbligatoria per la validazione |
 | settings | oggetto | Sezione 7 |
 | scenes, links, groups, endings, encounters | elenchi | |
 | npcs, enemies, items, quests, dialogs | elenchi | Cataloghi |
-| images, flags, documents, presets | elenchi | |
+| images, sounds, flags, documents, presets | elenchi | |
 
-**File `.dng`** = archivio zip con `project.json` e `images/<id>.<ext>`. Il salvataggio è atomico (file temporaneo + rinomina) e mantiene una copia `.bak`. L'autosalvataggio scrive allo stesso modo.
+**File `.dng`** = archivio zip con `project.json`, `media/` e `sound/` (con le sottocartelle della libreria). Il salvataggio è atomico (file temporaneo + rinomina) e mantiene una copia `.bak`. L'autosalvataggio scrive allo stesso modo.
 
-**Versione del formato e migrazioni.** `schemaVersion` (costante `SCHEMA_VERSION` in `src/shared/model/project.ts`) cresce solo per cambi incompatibili del modello. All'apertura (file `.dng` e import JSON) `migrateProject` (`model/migrate.ts`) porta il JSON grezzo alla versione corrente con una funzione per ogni salto (`MIGRATIONS[N]`: da N a N+1) e solo dopo lo valida con lo schema. Il main conserva l'originale come `nome.dng.v<N>.bak` prima che venga riscritto; l'app avvisa che il file è stato aggiornato. Un file più recente dell'app si rifiuta con un errore, senza toccarlo. Le regole per chi cambia il modello sono in `.claude/rules/modello-dati.md`.
+**Versione del formato.** Esiste un solo formato: nessun progetto precedente va mantenuto leggibile, quindi non ci sono migrazioni. `schemaVersion` (costante `SCHEMA_VERSION` in `src/shared/model/project.ts`) si scrive nel file; all'apertura (file `.dng` e import JSON) `loadProject` (`model/load.ts`) rifiuta con un errore chiaro un file più recente dell'app, senza toccarlo, e valida il resto con lo schema. Se un giorno ci saranno file in circolazione da proteggere, qui andranno reintrodotte le migrazioni.
 
 Le preferenze dell'app (tema, scala interfaccia, dimensione testo, aggancio dei nodi, scorciatoie, ricerca automatica degli aggiornamenti, disposizione delle schede, progetti recenti) non stanno nel progetto ma nel browser storage dell'app (localStorage).
 
@@ -104,6 +104,7 @@ Durante il playtest (e per l'export) alcune cose diventano fatti senza bisogno d
 | title | testo | Obbligatorio |
 | description | testo lungo | |
 | imageId | rif. immagine | Una sola |
+| soundIds | rif. suoni | Musica o ambiente della scena, da ascoltare dal player |
 | tag | neutral / safe / warning | |
 | tagHidden | sì/no | Nasconde il chip del tag sul nodo del grafo |
 | labelIds | rif. etichette | Etichette personalizzate di scena, definite nelle impostazioni (§7) |
@@ -188,6 +189,7 @@ Un dialogo è "solo contesto" se non contiene effetti né prove: è calcolato, n
 ## 6. Libreria, flag, documenti, preset
 
 - **Immagine:** `fileName`, `title`, `tags`, `mime`, `width`, `height`. Il file viene copiato nel `.dng`.
+- **Suono:** `fileName`, `title`, `tags`, `mime`, `folder`. Il file viene copiato nel `.dng` sotto `sound/<folder>/<id>.<ext>`. Lo stesso vale per i media (`media/…`, con le miniature in `thumbs/<id>.jpg|png`). `folder` è un percorso "A/B" (vuoto = radice) che coincide con le cartelle dentro lo zip; `Project.imageFolders` / `soundFolders` elencano le cartelle (anche vuote) che compaiono come cartelle vere nello zip. I tag restano un'altra dimensione, indipendente dalle cartelle. Una scena li associa con `soundIds` (elenco, anche vuoto); un suono associato non si elimina finché è usato. Campi aggiunti con valore predefinito: i `.dng` precedenti si leggono senza migrazione.
 - **Flag:** `name`, `description`, `defaultValue`.
 - **Documento:** `title`, `markdown`, `order`.
   - I link alle entità usano la sintassi `@[Testo visibile](tipo:id)`, ad esempio `@[Oste Bruno](npc:npc_V1StGXR8Z5)`.

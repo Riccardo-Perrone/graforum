@@ -44,6 +44,7 @@ export function buildUsageIndex(project: Project): Map<string, Owner[]> {
   const known = new Set<string>([
     ...all.map(([o]) => o.id),
     ...project.images.map((i) => i.id),
+    ...project.sounds.map((s) => s.id),
     ...project.flags.map((f) => f.id),
     ...project.quests.flatMap((q) => q.steps.map((s) => s.id)),
     ...project.dialogs.flatMap((d) => d.lines.flatMap((l) => [l.id, ...l.choices.map((c) => c.id)]))

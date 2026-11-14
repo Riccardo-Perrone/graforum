@@ -1,4 +1,4 @@
-import { DOC_LINK, migrateProject, SCHEMA_VERSION, type Project, type Scene } from '../model'
+import { DOC_LINK, loadProject, mediaEntryPath, SCHEMA_VERSION, type Project, type Scene } from '../model'
 import { describeCheck, describeCondition, describeEffect, entityName } from '../engine/describe'
 import { findRefs } from '../engine/refs'
 import { validate, type Issue } from '../engine/validate'
@@ -49,7 +49,7 @@ export function scopeProject(p: Project, scope: ExportScope, opts: ExportOptions
     documents: docs,
     presets: []
   }
-  if (!opts.includeUsedCatalog) return { ...base, npcs: [], enemies: [], items: [], quests: [], dialogs: [], images: [], flags: [] }
+  if (!opts.includeUsedCatalog) return { ...base, npcs: [], enemies: [], items: [], quests: [], dialogs: [], images: [], sounds: [], flags: [] }
 
   // Voci di catalogo raggiunte dalle scene del gruppo (anche indirettamente: dialoghi → oggetti…).
   const used = new Set<string>()
@@ -74,6 +74,7 @@ export function scopeProject(p: Project, scope: ExportScope, opts: ExportOptions
     quests: p.quests.filter((x) => used.has(x.id)),
     dialogs: p.dialogs.filter((x) => used.has(x.id)),
     images: p.images.filter((x) => used.has(x.id)),
+    sounds: p.sounds.filter((x) => used.has(x.id)),
     flags: p.flags.filter((x) => used.has(x.id))
   }
 }
@@ -106,7 +107,8 @@ export function exportJson(p: Project, scope: ExportScope, opts: ExportOptions =
       version: SCHEMA_VERSION,
       exportedAt: new Date().toISOString(),
       scope,
-      images: data.images.map((i) => ({ ...i, path: `images/${i.id}${i.fileName.match(/\.[a-z0-9]+$/i)?.[0]?.toLowerCase() ?? ''}` })),
+      images: data.images.map((i) => ({ ...i, path: mediaEntryPath('image', i) })),
+      sounds: data.sounds.map((s) => ({ ...s, path: mediaEntryPath('sound', s) })),
       project: stripEditorData(data)
     },
     null,
@@ -126,8 +128,7 @@ export function importJson(text: string): Project {
   scenes.forEach((s, i) => (s['position'] ??= { x: (i % 6) * 260, y: Math.floor(i / 6) * 220 }))
   const dialogs = (Array.isArray(data['dialogs']) ? data['dialogs'] : []) as { lines?: Record<string, unknown>[] }[]
   dialogs.forEach((d) => d.lines?.forEach((l, i) => (l['position'] ??= { x: i * 660, y: 0 })))
-  // La versione mancante vale come primo formato; migrateProject porta il file a quello corrente.
-  return migrateProject(data).project
+  return loadProject(data)
 }
 
 // ——— Documento leggibile (HTML, e da qui PDF) ———
@@ -143,7 +144,7 @@ function sceneHtml(p: Project, s: Scene, withImages: boolean): string {
   const parts: string[] = [
     `<section class="scene" id="${s.id}"><h3>${esc(s.title)} <span class="tag ${s.tag}">${TAG[s.tag]}</span>${p.startSceneId === s.id ? ' <span class="tag start">Partenza</span>' : ''}${ending ? ` <span class="tag" style="color:${ending.color};border-color:${ending.color}">${esc(ending.label)}</span>` : ''}</h3>`
   ]
-  if (img) parts.push(`<img src="images/${img.id}${img.fileName.match(/\.[a-z0-9]+$/i)?.[0]?.toLowerCase() ?? ''}" alt="">`)
+  if (img) parts.push(`<img src="${mediaEntryPath('image', img)}" alt="">`)
   parts.push(para(s.description))
   if (s.access.condition) parts.push(`<p class="cond">Accesso: ${esc(describeCondition(p, s.access.condition))}</p>`)
   if (s.entryEffects.length) parts.push(`<p class="fx">All’ingresso: ${s.entryEffects.map((e) => esc(describeEffect(p, e))).join('; ')}</p>`)

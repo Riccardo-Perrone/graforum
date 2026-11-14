@@ -24,7 +24,7 @@ Dopo l'installazione l'app cerca da sola le nuove versioni all'avvio. Puoi anche
 
 ## I tuoi progetti
 
-Ogni progetto è un unico file `.dng` (un archivio zip con `project.json` e le immagini) che salvi dove vuoi. Il salvataggio è atomico e tiene una copia `.bak`. I file creati con versioni precedenti dell'app si aprono sempre: se il formato è cambiato vengono aggiornati, conservando l'originale come `nome.dng.v<N>.bak`. Un file più recente dell'app viene rifiutato senza essere modificato.
+Ogni progetto è un unico file `.dng` (un archivio zip con `project.json` e le immagini) che salvi dove vuoi. Il salvataggio è atomico e tiene una copia `.bak`. Non c'è compatibilità con file di versioni precedenti dell'app. Un file più recente dell'app viene rifiutato senza essere modificato.
 
 ## Sviluppo
 
@@ -46,7 +46,7 @@ npm run icon       # rigenera build/icon.*
 
 | Cartella                       | Contenuto                                                                                         |
 | ------------------------------ | ------------------------------------------------------------------------------------------------- |
-| `src/shared/model`             | Schemi Zod del modello (fonte di verità), id, indice "Usato in", migrazioni dei file              |
+| `src/shared/model`             | Schemi Zod del modello (fonte di verità), id, indice "Usato in", lettura dei file              |
 | `src/shared/engine`            | Logica pura: condizioni, validazione, percorso decisivo, fonti dei requisiti                      |
 | `src/shared/export` · `sample` | Export JSON/HTML/PDF e import · progetto di esempio "La locanda del Corvo" (usato anche nei test) |
 | `src/main`                     | Processo principale Electron: finestra, file `.dng`, IPC, aggiornamenti                           |
@@ -55,7 +55,7 @@ npm run icon       # rigenera build/icon.*
 | `scripts`                      | `smoke.cjs` (prova nell'app vera), `screenshot.cjs`, `make-icon.cjs`                              |
 | `docs`                         | `sviluppo.md` (stato e architettura), `modello-dati-v3.md` (decisioni sul modello)                |
 
-Ogni modifica al progetto passa da `useProjectStore().apply(...)`, che registra le patch per annulla/ripeti. Le regole per chi sviluppa (anche con un agente) sono in `CLAUDE.md`; se cambi il modello dati leggi `.claude/rules/modello-dati.md`.
+Ogni modifica al progetto passa da `useProjectStore().apply(...)`, che registra le patch per annulla/ripeti. Le regole per chi sviluppa (anche con un agente) sono in `CLAUDE.md`.
 
 ### Rilasciare una versione
 

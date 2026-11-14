@@ -13,6 +13,7 @@ import { useCommand } from '../lib/shortcuts'
 import { DialogEditor } from '../screens/DialogEditor'
 import { DialogsListView } from '../screens/DialogsListView'
 import { DocumentsView } from '../screens/DocumentsView'
+import { LibraryView } from '../screens/LibraryView'
 import { PlaytestView } from '../screens/PlaytestView'
 import { useUiStore } from '../store/ui'
 import type { PanelId } from './bridge'
@@ -84,5 +85,6 @@ export const PANEL_COMPONENTS: Record<PanelId, FunctionComponent<P>> = {
   playtest: wrap((p) => <PlaytestView key={String(p.params.nonce)} startSceneId={(p.params.startSceneId as string | null) ?? null} />),
   // Elenco e editor dei dialoghi stanno nella stessa scheda: `dialogId` apre il dialogo, senza `dialogId` si vede l'elenco.
   dialogs: wrap((p) => (p.params.dialogId ? <DialogEditor dialogId={String(p.params.dialogId)} /> : <DialogsListView />)),
-  documents: wrap((p) => <DocumentsView docId={(p.params.docId as string | null) ?? null} />)
+  documents: wrap((p) => <DocumentsView docId={(p.params.docId as string | null) ?? null} />),
+  library: wrap((p) => <LibraryView tab={p.params.tab === 'sounds' ? 'sounds' : 'images'} />)
 }

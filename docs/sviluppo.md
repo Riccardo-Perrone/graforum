@@ -71,6 +71,7 @@ Prima di scrivere un aiuto nuovo, cerca qui: quasi tutto ciò che serve in più 
 | Disposizione del grafo (nodi, archi, gruppi collassati) | `components/graph/buildGraph.ts` (`buildGraph`, `sceneTopLeft`); aggancio in `snap.ts` |
 | Conferma, finestra modale, menu a comparsa | `components/ui/ConfirmDialog.tsx` (`confirmDialog`), `ui/Sheet.tsx` (`Sheet`, `Section`, `EditHint`), `ui/form.tsx` (`useClickOutside`: clic fuori o Esc) |
 | Campo di ricerca | `components/ui/SearchInput.tsx` (lente, svuota, filtro mentre si scrive): ogni ricerca dell'app lo usa, con `matchesQuery` per il confronto |
+| Player dei suoni (un solo audio per tutta l'app, volume in `Prefs.volume`) e suo aspetto | `store/player.ts` (`usePlayer`: `toggle`, `stop`, `seek`, `setLoop`), `components/sounds/SoundPlayer.tsx` (`PlayButton`, `PlayerBar`, `importSounds`) |
 | Pulsanti, chip del tag, classi | `components/ui/primitives.tsx` (`DangerButton`, `ToolbarButton`, `IconButton`, `TagChip`, `cn`) |
 
 ## Convenzioni
@@ -78,7 +79,7 @@ Prima di scrivere un aiuto nuovo, cerca qui: quasi tutto ciò che serve in più 
 - Interfaccia e commenti in italiano, commenti brevi.
 - Id prefissati: `newId('scene')` → `scn_xxxxxxxxxx`. Il progetto di esempio usa id leggibili fissi (es. `scn_cantina`).
 - Le modifiche al progetto passano solo da `useProjectStore().apply(etichetta, bozza => …, mergeKey?)`. Gli helper di `lib/entities.tsx` (`apply`, `useProject`, `options`) lo avvolgono.
-- Nuove impostazioni dell'app in `Prefs` (`store/ui.ts`, localStorage `graforum.prefs`), lette e scritte con `setPrefs`. Prefs attuali: `theme`, `uiScale`, `textScale`, `snap`, `shortcuts`, `autoCheckUpdates`, `layout`, `savedFilters` (viste dei filtri; prima stavano in `graforum.savedFilters`, che si legge ancora una volta per recuperarle). I progetti recenti (`graforum.recent`) sono una cronologia, non un'impostazione, e restano a parte.
+- Nuove impostazioni dell'app in `Prefs` (`store/ui.ts`, localStorage `graforum.prefs`), lette e scritte con `setPrefs`. Prefs attuali: `theme`, `uiScale`, `textScale`, `snap`, `shortcuts`, `autoCheckUpdates`, `layout`, `volume` (player dei suoni), `libraryView` (elenco / icone piccole / icone grandi della Libreria), `libraryTree` (albero delle cartelle mostrato o nascosto), `savedFilters` (viste dei filtri; prima stavano in `graforum.savedFilters`, che si legge ancora una volta per recuperarle). I progetti recenti (`graforum.recent`) sono una cronologia, non un'impostazione, e restano a parte.
 - Stile: misure del README di handoff (controlli 28–32px, etichette di categoria mono 10px maiuscolo, sezioni numerate "01 · ETICHETTA"). Token colore: `tx/tx2/tx3`, `ac`, `safe`, `warn`, `err`, `line/line2`, `raised/sunken/panel/hover`.
 - Layout responsive: righe con `flex-wrap`, `min-w-0` e `basis-*` al posto di larghezze fisse (un `flex-1` in una riga che va a capo ha bisogno di `basis-1`, una riga `flex-col` con wrap va in `flex-nowrap`).
 - Entità nuove con le fabbriche di `shared/model/factories.ts` (o `Schema.parse({ id, … })`): niente oggetti scritti campo per campo, così un campo aggiunto allo schema vale ovunque.
@@ -90,8 +91,8 @@ Prima di scrivere un aiuto nuovo, cerca qui: quasi tutto ciò che serve in più 
 
 ### Modello e file
 - Schemi in `src/shared/model`; indice inverso "Usato in" (`buildUsageIndex`); `createEmptyProject`.
-- `.dng` = zip con `project.json` + `images/`; scrittura atomica con `.bak`; autosalvataggio dopo 2 s dall'ultima modifica, solo se il progetto ha già un file. Recenti in localStorage (`graforum.recent`, 8 voci). Immagini lette come `graforum-img://lib/<id>`.
-- **Versioni:** `SCHEMA_VERSION` = 1, nessuna migrazione ancora. `migrate.ts` + regola in `.claude/rules/modello-dati.md` (si carica solo toccando i file del modello): leggere sempre i file vecchi, copia `nome.dng.v<N>.bak` prima di riscrivere un file migrato.
+- `.dng` = zip con `project.json` + `media/` + `sound/` (con le sottocartelle della libreria, anche vuote: `sound/Musica/Taverna/<id>.mp3`); scrittura atomica con `.bak`; autosalvataggio dopo 2 s dall'ultima modifica, solo se il progetto ha già un file. Recenti in localStorage (`graforum.recent`, 8 voci). Immagini lette come `graforum-img://lib/<id>`.
+- **Versioni:** `SCHEMA_VERSION` = 1. Nessuna migrazione e nessuna compatibilità con file vecchi (non ne esistono): si cambia lo schema liberamente. `loadProject` (`model/load.ts`) rifiuta solo i file più nuovi dell'app.
 
 ### Motore (`src/shared/engine`)
 Descrizioni in parole (`describe`), valutazione per il playtest con avanzamento automatico degli step (`evaluate`), transizioni, raggiungibilità, percorso decisivo e unicità dei collegamenti (`graph`), gerarchia dei gruppi (`groups`), fonti dei requisiti (`sources`), elenco "Avanzamento" (`progress`), elenco dialoghi (`dialogList`).
@@ -112,7 +113,7 @@ Nodi scena, archi "floating" con scostamento per andata/ritorno, gruppi annidati
 - Dopo ogni spostamento `pruneGroupEnds` toglie entrate e uscite che non sono più scene del gruppo o dei sottogruppi. Un gruppo si trascina dall'etichetta; tenendo scene ~1 s sull'area di un gruppo le si aggiunge. Il clic su un gruppo lo seleziona e apre la scheda "Scheda". Scena: copertina stile Trello, etichette personalizzate, tag nascondibile.
 
 ### Dock di schede (`src/renderer/src/dock`)
-- `dockview-react`; il grafo è al centro, aree sinistra/destra/basso sono *edge group* comprimibili. Schede (`panelList.ts`): `graph`, `inspector` ("Scheda": scena o gruppo secondo la selezione), `catalog`, `validation`, `playtest`, `dialogs`, `documents`. `PANEL_AREA` dice solo dove nasce una scheda nel layout standard; poi si sposta ovunque.
+- `dockview-react`; il grafo è al centro, aree sinistra/destra/basso sono *edge group* comprimibili. Schede (`panelList.ts`): `graph`, `inspector` ("Scheda": scena o gruppo secondo la selezione), `catalog`, `validation`, `playtest`, `dialogs`, `documents`, `library` (Libreria: sezioni Immagini e Suoni, `screens/LibraryView.tsx`; parametro `tab`). `PANEL_AREA` dice solo dove nasce una scheda nel layout standard; poi si sposta ovunque.
 - **Aprire una scheda:** `useUiStore().setView(...)`, `openEntity(...)` o `dockBridge.openPanel(id, params)` (`bridge.ts`, compilato da `DockHost`). Toglie un ingrandimento, espande l'area compressa, attiva la scheda; se chiusa la riapre nel centro. I menu Vista/Finestra aprono sempre; i `toggle…` e il pulsante Validazione chiudono solo se la scheda è già in vista. Il bridge non ha import, per evitare cicli con lo store.
 - **Dialoghi:** elenco ed editor sono la stessa scheda (`dialogs`; il parametro `dialogId` apre il dialogo, senza torna l'elenco). Non esistono pulsanti "Torna al grafo".
 - **Ingrandisci** (`maximize.ts`, Ctrl+Spazio): chiude le aree laterali e porta al centro, finché dura, una scheda che stava in un'area (dockview non ingrandisce gli edge group).
@@ -129,10 +130,11 @@ Nodi scena, archi "floating" con scostamento per andata/ritorno, gruppi annidati
 - **Documenti** (`DocumentsView`): CodeMirror, completamento con `@`, struttura, anteprima con chip, scheda in miniatura al passaggio del mouse, clic che apre l'entità.
 
 ### Catalogo, ricerca, viste, validazione, export
-- Catalogo con schede NPC/enemy/oggetto/quest (fonti collegate, "Usato in"), libreria immagini.
+- Catalogo con schede NPC/enemy/oggetto/quest (fonti collegate, "Usato in").
+- **Libreria** (scheda del dock, Ctrl+Maiusc+L): media (le immagini, `Project.images`) e suoni come in un esplora file (`screens/LibraryView.tsx`): albero di cartelle, percorso, tre viste, trascinamento di file e cartelle per spostarli, ricerca su tutte le cartelle, tag (ortogonali alle cartelle), caricamento, eliminazione bloccata se in uso. `Image.folder` / `Sound.folder` ("A/B") e `Project.imageFolders` / `soundFolders` (cartelle vuote) coincidono con le cartelle dentro il `.dng`: il percorso nel file lo calcola sempre `mediaEntryPath` (`shared/model/media.ts`, con le operazioni `createFolder`/`moveFolder`/`deleteFolder`). Le tessere mostrano **miniature** (400 px di larghezza, `main/thumbs.ts`, `graforum-img://thumb/<id>`): si creano al caricamento e restano nel `.dng` sotto `thumbs/<id>.jpg|png`; senza miniatura (immagine già piccola, svg) si usa l'originale. I byte originali restano comunque in memoria. L'albero delle cartelle ha in cima «Nuova cartella» e il pulsante per comprimerlo; la radice si chiama come la cartella vera (`media`, `sound`). Il **player** (`PlayerBar`) sta in fondo alla sola sezione Suoni e sotto i suoni di una scena; un solo suono suona alla volta. Ogni scena ha una sezione "Suoni" (`Scene.soundIds`) con ▶ su ogni suono. Comandi: `library`, `togglePlayback`, `stopPlayback`. I suoni stanno in memoria nel main insieme alle immagini (stessa mappa, id con prefisso `snd`) e il protocollo `graforum-img` risponde anche alle richieste `Range`, così la barra del player può scorrere. Perché l'audio parta servono il privilegio `stream` dello schema e `media-src graforum-img:` nella CSP di `index.html`: senza, l'elemento audio dà errore.
 - Ricerca Ctrl+K, filtri con viste salvate, selettore Percorso. Viste incrociate (`CrossViews`): dove serve un oggetto, quest nel grafo, NPC, enemy, avanzamento filtrabile con evidenziazione nel grafo.
 - Pannello validazione con correzioni rapide (`highlight` nello store attenua il resto del grafo).
-- Export JSON (senza dati solo-editor), HTML e PDF (senza immagini), zip con immagini; ambito tutto/gruppo/cataloghi; blocco per errori nell'ambito. Import JSON da File › Importa (passa da `migrateProject`).
+- Export JSON (senza dati solo-editor), HTML e PDF (senza immagini), zip con immagini; ambito tutto/gruppo/cataloghi; blocco per errori nell'ambito. Import JSON da File › Importa (passa da `loadProject`).
 
 ### Scorciatoie e impostazioni
 - `lib/commands.ts` (`COMMANDS`: gruppi File, Modifica, Vista, Grafo, Dialoghi, Playtest, Schermate, Layout) + `useCommand`/`useKbd`; pagina Impostazioni › Scorciatoie con registrazione dei tasti, conflitti e ripristino. Esc (`closeSheet`) chiude la finestra in cima; `confirmDialog()` sostituisce `window.confirm`.
@@ -162,16 +164,17 @@ Nodi scena, archi "floating" con scostamento per andata/ritorno, gruppi annidati
 
 | File | Cosa verifica |
 | --- | --- |
-| `shared/model/model.test.ts` | Id con prefisso; progetto vuoto con abilità e tipi predefiniti; esempio valido dopo un giro JSON; indice "Usato in" |
+| `shared/model/model.test.ts` | Id con prefisso; progetto vuoto con abilità e tipi predefiniti; esempio valido dopo un giro JSON; indice "Usato in"; suono associato a una scena (usato in, riferimenti) |
 | `shared/model/factories.test.ts` | Le fabbriche `make*` producono entità che lo schema accetta, con i valori predefiniti attesi e id sempre nuovi; colori dei finali a rotazione; gruppo vuoto |
-| `shared/model/migrate.test.ts` | Migrazioni in sequenza, partenza dalla versione giusta, file più nuovi rifiutati, migrazioni mancanti, input non validi, una migrazione per ogni versione precedente |
+| `shared/model/load.test.ts` | Progetto corrente letto senza cambiarlo, file più nuovi rifiutati, input che non sono un progetto |
 | `shared/engine/engine.test.ts` | Validazione dell'esempio (Warning senza incontro, vicolo cieco, riferimenti rotti, irraggiungibili); percorso decisivo; playtest con gate bloccato e avanzamento automatico degli step; descrizioni; fonti degli step; "Avanzamento"; elenco e filtri dei dialoghi |
 | `shared/engine/evaluate.test.ts` | Stato iniziale e preset; ottenere/perdere oggetti; immutabilità; sblocca/blocca; avanzare a uno step; completare la quest; gruppi E/O; condizioni personalizzate; esiti degli incontri |
 | `shared/engine/helpers.test.ts` | Discendenti e antenati dei gruppi (anche in ordine sparso e con cicli); `canLink`; `allChecks`/`checkName`; `scenesWithDialog`; confronto del testo (maiuscole uguali, accenti distinti, posizione); `validateCached` |
 | `shared/engine/groups.test.ts` | Gruppi selezionati per intero (anche con carte collassate); antenato comune; Raggruppa con gruppi interi, scene sciolte e nel gruppo padre; rilascio di gruppi e selezioni in un gruppo, senza cicli né salite; pulizia di entrate e uscite |
 | `shared/engine/encounters.test.ts` | Incontri resi orfani da eliminazione di scene o distacco; incontri in più scene; orfani preesistenti; avviso "Incontro senza scena"; chi blocca l'eliminazione; codici stabili dei problemi |
 | `shared/export/exporter.test.ts` | Ambito gruppo (scene e catalogo usato); blocco solo per errori nell'ambito; JSON senza dati solo-editor e reimportabile; HTML senza script |
-| `main/projectFile.test.ts` | `.dng`: salva e riapre identico, solo immagini in libreria, copia `.bak`, file senza `project.json`, file più nuovi, copia unica prima della migrazione |
+| `shared/model/media.test.ts` | Cartelle della libreria: percorso nel file, nomi validi, creazione annidata, sposta/rinomina (con file e sottocartelle), eliminazione che fa salire il contenuto |
+| `main/projectFile.test.ts` | `.dng`: cartelle della libreria (anche vuote) dentro lo zip, salva e riapre identico, solo immagini e suoni in libreria (`media/`, `sound/`), copia `.bak`, file senza `project.json`, file più nuovi |
 | `renderer/src/dock/layout.test.ts` | Layout salvati accettati o rifiutati (`isUsableLayout`); rimozione delle finestre staccate (`stripPopouts`) |
 | `renderer/src/lib/commands.test.ts` | Registro delle scorciatoie: id unici, combinazioni predefinite senza conflitti e nel formato giusto, personalizzazioni, conflitti per ambito, etichette in italiano, lettura dei tasti |
 | `renderer/src/lib/playtest.test.ts` | Playtest dall'inizio solo con scena di partenza (come il pulsante); dalla selezione o da una scena indicata |
@@ -179,6 +182,7 @@ Nodi scena, archi "floating" con scostamento per andata/ritorno, gruppi annidati
 | `renderer/src/components/graph/buildGraph.test.ts` | Nodi e archi dell'esempio; ingombro dei gruppi annidati; gruppi collassati (carta, scene nascoste, archi spostati sulla carta); `sceneTopLeft` |
 | `renderer/src/components/graph/snap.test.ts` | Aggancio a bordi e centri entro la soglia, guide, nessun aggancio oltre la soglia |
 | `renderer/src/components/search/search.test.ts` | Ricerca globale (titoli, cataloghi, scene da evidenziare, accenti distinti); filtri per gruppo con sottogruppi, tag, finali, problemi, entità usata, combinati; viste salvate nelle preferenze |
+| `scripts/smoke-library.cjs` (Electron, `npm run build && npx electron scripts/smoke-library.cjs`) | Libreria: player solo in Suoni; miniature (400 px, nel `.dng`); albero cartelle che si nasconde, con «Nuova cartella» in cima; mp3 caricato, letto e in avanzamento; cartelle (crea, annida, trascina file e cartelle, rinomina, nome non valido); tre viste; file salvato con le cartelle vere; caricamento di un suono dalla scena |
 | `scripts/smoke.cjs` (Electron) | Etichette dei gruppi cliccabili; collassa/espandi; trascinamento dei gruppi; gruppo colorato quando tutte le sue scene sono selezionate; Raggruppa che tiene la Locanda intera come sottogruppo; gruppo trascinato e rilasciato dentro un altro; cursore di spostamento; etichette, copertina e tag dalla scheda scena; Canc con conferma; menu contestuale con Esc; tasti del grafo fermi sotto una finestra modale; scena con incontro usato da una quest non eliminabile; Ctrl+K da un'altra scheda; gruppo nella scheda; dock (layout standard, ingrandisci, aree, salvataggio, menu Finestra e ⋯); dialoghi nella stessa scheda; scheda scena modale e a 260px |
 
 ## Limiti noti

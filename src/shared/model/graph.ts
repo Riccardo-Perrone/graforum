@@ -46,6 +46,8 @@ export const Scene = z.object({
   title: z.string().min(1),
   description: z.string().default(''),
   imageId: Id.nullable().default(null),
+  /** Suoni della libreria associati alla scena (musica, ambiente…). */
+  soundIds: z.array(Id).default([]),
   tag: SceneTag.default('neutral'),
   /** Chip del tag nascosto sul nodo del grafo. */
   tagHidden: z.boolean().default(false),

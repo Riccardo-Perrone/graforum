@@ -43,6 +43,8 @@ export function entityName(p: Project, type: EntityType, id: string | null | und
       return find(p.encounters)?.name ?? '(incontro eliminato)'
     case 'image':
       return find(p.images)?.title || find(p.images)?.fileName || '(immagine eliminata)'
+    case 'sound':
+      return find(p.sounds)?.title || find(p.sounds)?.fileName || '(suono eliminato)'
     case 'flag':
       return find(p.flags)?.name ?? '(flag eliminato)'
     case 'document':

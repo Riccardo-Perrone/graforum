@@ -10,6 +10,7 @@ import { DockHost } from './dock/DockHost'
 import { SheetHost } from './screens/SheetHost'
 import { Home } from './screens/Home'
 import { isDirty, useProjectStore } from './store/project'
+import { usePlayer } from './store/player'
 import { startUpdates } from './store/updates'
 import { effectiveTheme, useUiStore } from './store/ui'
 
@@ -47,6 +48,11 @@ export function App() {
     return () => clearTimeout(timer)
   }, [])
 
+  // Chiudendo il progetto il suono in riproduzione non esiste più.
+  useEffect(() => {
+    if (!hasProject) usePlayer.getState().stop()
+  }, [hasProject])
+
   // Autosalvataggio: solo se il progetto ha già un file.
   const revision = useProjectStore((s) => s.revision)
   const canAutosave = useProjectStore((s) => s.filePath !== null && isDirty(s))
@@ -65,6 +71,9 @@ export function App() {
   useCommand('newProject', newProject)
   useCommand('toggleTheme', useUiStore.getState().toggleTheme)
   useCommand('documents', () => hasProject && dockBridge.openPanel?.('documents'))
+  useCommand('library', () => hasProject && dockBridge.openPanel?.('library'))
+  useCommand('togglePlayback', () => hasProject && usePlayer.getState().toggle())
+  useCommand('stopPlayback', () => hasProject && usePlayer.getState().stop())
   useCommand('dialogList', () => hasProject && dockBridge.openPanel?.('dialogs'))
   // Comandi globali che non devono dipendere dalla scheda del grafo (che si può chiudere).
   useCommand('playFromStart', () => hasProject && playFromStart())

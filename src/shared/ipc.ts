@@ -2,7 +2,7 @@ import type { Project } from './model'
 
 /** Esito dell'apertura o del salvataggio di un file `.dng`. */
 export type FileResult =
-  | { ok: true; path: string; project: Project; migrated?: { from: number; backup: string | null } }
+  | { ok: true; path: string; project: Project }
   | { ok: false; canceled: true }
   | { ok: false; canceled: false; error: string }
 
@@ -12,6 +12,21 @@ export interface ImportedImage {
   id: string
   fileName: string
   mime: string
+}
+
+export interface ImportedSound {
+  id: string
+  fileName: string
+  mime: string
+}
+
+/** File multimediale da copiare in un archivio di esportazione. */
+export interface MediaRef {
+  id: string
+  fileName: string
+  folder?: string
+  /** Assente = immagine. */
+  kind?: 'sound'
 }
 
 export interface ExportFile {
@@ -43,8 +58,9 @@ export interface GraforumApi {
   /** Svuota la libreria in memoria (nuovo progetto o esempio). */
   resetImages(): Promise<void>
   importImages(): Promise<ImportedImage[]>
+  importSounds(): Promise<ImportedSound[]>
   exportFile(file: ExportFile): Promise<string | null>
-  exportZip(defaultName: string, files: Record<string, string>, images: { id: string; fileName: string }[]): Promise<string | null>
+  exportZip(defaultName: string, files: Record<string, string>, media: MediaRef[]): Promise<string | null>
   exportPdf(html: string, defaultName: string): Promise<string | null>
   importJson(): Promise<string | null>
   showItemInFolder(path: string): Promise<void>
@@ -60,3 +76,7 @@ export interface GraforumApi {
 }
 
 export const imageUrl = (id: string) => `graforum-img://lib/${encodeURIComponent(id)}`
+/** Miniatura di un'immagine (si crea al primo bisogno se il file non ne ha). */
+export const thumbUrl = (id: string) => `graforum-img://thumb/${encodeURIComponent(id)}`
+/** Immagini e suoni si leggono dallo stesso protocollo, per id. */
+export const soundUrl = imageUrl

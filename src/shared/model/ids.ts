@@ -18,6 +18,7 @@ export const ID_PREFIX = {
   dialogChoice: 'dch',
   encounter: 'enc',
   image: 'img',
+  sound: 'snd',
   flag: 'flg',
   check: 'chk',
   sceneItem: 'sit',

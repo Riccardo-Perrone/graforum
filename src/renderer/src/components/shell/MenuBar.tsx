@@ -50,7 +50,8 @@ function menus(hasProject: boolean, canUndo: boolean, canRedo: boolean, canPlay:
         { label: 'Ripeti', kbd: kbdLabel('redo'), run: () => useProjectStore.getState().redo(), disabled: !canRedo },
         sep,
         { label: 'Raggruppa la selezione', kbd: kbdLabel('groupSelection'), run: () => void groupSelection(), disabled: needs || !canGroupSelection() },
-        { label: 'Libreria immagini', run: () => ui().openSheet({ kind: 'images' }), disabled: needs }
+        { label: 'Libreria media', run: view({ kind: 'library', tab: 'images' }), disabled: needs },
+        { label: 'Libreria suoni', run: view({ kind: 'library', tab: 'sounds' }), disabled: needs }
       ]
     ],
     [
@@ -58,6 +59,7 @@ function menus(hasProject: boolean, canUndo: boolean, canRedo: boolean, canPlay:
       [
         { label: 'Grafo', run: view({ kind: 'graph' }), disabled: needs },
         { label: 'Documenti', kbd: kbdLabel('documents'), run: () => dockBridge.openPanel?.('documents'), disabled: needs },
+        { label: 'Libreria', kbd: kbdLabel('library'), run: () => dockBridge.openPanel?.('library'), disabled: needs },
         { label: 'Dialoghi', kbd: kbdLabel('dialogList'), run: () => dockBridge.openPanel?.('dialogs'), disabled: needs },
         { label: 'Pannello catalogo', kbd: kbdLabel('toggleCatalog'), run: () => dockBridge.openPanel?.('catalog'), disabled: needs },
         { label: 'Validazione', kbd: kbdLabel('toggleValidation'), run: () => dockBridge.openPanel?.('validation'), disabled: needs },

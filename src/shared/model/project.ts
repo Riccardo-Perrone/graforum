@@ -14,10 +14,23 @@ export const Image = z.object({
   title: z.string().default(''),
   tags: z.array(z.string()).default([]),
   mime: z.string(),
+  /** Cartella in libreria ("A/B"), uguale a quella dentro il .dng. Vuota = radice. */
+  folder: z.string().default(''),
   width: z.number().int().nullable().default(null),
   height: z.number().int().nullable().default(null)
 })
 export type Image = z.infer<typeof Image>
+
+/** Suono della libreria (musica, effetti, ambienti). Il file viene copiato nel `.dng` sotto `sound/`. */
+export const Sound = z.object({
+  id: Id,
+  fileName: z.string(),
+  title: z.string().default(''),
+  tags: z.array(z.string()).default([]),
+  mime: z.string(),
+  folder: z.string().default('')
+})
+export type Sound = z.infer<typeof Sound>
 
 export const Flag = z.object({
   id: Id,
@@ -108,6 +121,10 @@ export const Project = z.object({
   quests: z.array(Quest).default([]),
   dialogs: z.array(Dialog).default([]),
   images: z.array(Image).default([]),
+  sounds: z.array(Sound).default([]),
+  /** Cartelle della libreria, anche vuote (quelle con file sono implicite). */
+  imageFolders: z.array(z.string()).default([]),
+  soundFolders: z.array(z.string()).default([]),
   flags: z.array(Flag).default([]),
   documents: z.array(ProjectDocument).default([]),
   presets: z.array(Preset).default([])

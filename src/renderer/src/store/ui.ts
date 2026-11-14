@@ -25,27 +25,21 @@ export interface Prefs {
   layout: unknown
   /** Viste salvate dei filtri del grafo (nome + filtri). */
   savedFilters: SavedFilterView[]
+  /** Volume del player dei suoni, 0–1. */
+  volume: number
+  /** Vista dei media in libreria: elenco, icone piccole o grandi. */
+  libraryView: LibraryViewMode
+  /** Albero delle cartelle della Libreria mostrato o nascosto. */
+  libraryTree: boolean
 }
 
-const DEFAULT_PREFS: Prefs = { theme: 'dark', uiScale: 1, textScale: 1, snap: true, shortcuts: {}, autoCheckUpdates: true, layout: null, savedFilters: [] }
-
-/** Chiave con cui le versioni precedenti salvavano le viste dei filtri, fuori dalle preferenze: si legge una volta sola. */
-const LEGACY_FILTERS_KEY = 'graforum.savedFilters'
-
-function readLegacyFilters(): SavedFilterView[] {
-  try {
-    const old = JSON.parse(localStorage.getItem(LEGACY_FILTERS_KEY) ?? '[]') as unknown
-    return Array.isArray(old) ? (old as SavedFilterView[]) : []
-  } catch {
-    return []
-  }
-}
+const DEFAULT_PREFS: Prefs = { theme: 'dark', uiScale: 1, textScale: 1, snap: true, shortcuts: {}, autoCheckUpdates: true, layout: null, savedFilters: [], volume: 0.8, libraryView: 'large', libraryTree: true }
 
 function readPrefs(): Prefs {
   try {
     const stored = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') as Partial<Prefs>
     const shortcuts = Object.fromEntries(Object.entries(stored.shortcuts ?? {}).filter(([, v]) => typeof v === 'string'))
-    const savedFilters = Array.isArray(stored.savedFilters) ? stored.savedFilters : readLegacyFilters()
+    const savedFilters = Array.isArray(stored.savedFilters) ? stored.savedFilters : []
     return { ...DEFAULT_PREFS, ...stored, shortcuts, savedFilters }
   } catch {
     return DEFAULT_PREFS
@@ -60,10 +54,15 @@ const pickPrefs = (s: Prefs): Prefs => ({
   shortcuts: s.shortcuts,
   autoCheckUpdates: s.autoCheckUpdates,
   layout: s.layout,
-  savedFilters: s.savedFilters
+  savedFilters: s.savedFilters,
+  volume: s.volume,
+  libraryView: s.libraryView,
+  libraryTree: s.libraryTree
 })
 
-export type CatalogTab = 'all' | 'npc' | 'enemy' | 'item' | 'quest'
+export type LibraryTab = 'images' | 'sounds'
+export type LibraryViewMode = 'list' | 'small' | 'large'
+export type CatalogTab ='all' | 'npc' | 'enemy' | 'item' | 'quest'
 export type CatalogType = 'npc' | 'enemy' | 'item' | 'quest'
 export type SettingsPage = 'general' | 'appearance' | 'skills' | 'itemTypes' | 'customFields' | 'conditionTypes' | 'endings' | 'flags' | 'shortcuts' | 'updates'
 export type CrossTab = 'item' | 'quest' | 'progress' | 'npc' | 'enemy'
@@ -74,6 +73,7 @@ export type View =
   | { kind: 'dialog'; dialogId: string }
   | { kind: 'dialogList' }
   | { kind: 'documents'; docId: string | null }
+  | { kind: 'library'; tab: LibraryTab }
   | { kind: 'playtest'; startSceneId: string | null }
 
 export interface DialogListState {
@@ -179,6 +179,8 @@ export const useUiStore = create<UiState>((set, get) => ({
         return dockBridge.openPanel?.('dialogs', { dialogId: null })
       case 'documents':
         return dockBridge.openPanel?.('documents', { docId: view.docId })
+      case 'library':
+        return dockBridge.openPanel?.('library', { tab: view.tab })
       case 'playtest':
         return dockBridge.openPanel?.('playtest', { startSceneId: view.startSceneId, nonce: Date.now() })
     }
@@ -262,7 +264,10 @@ export function openEntity(type: EntityType, id: string): void {
       ui.openSheet({ kind: 'settings', page: 'flags' })
       return
     case 'image':
-      ui.openSheet({ kind: 'images' })
+      ui.setView({ kind: 'library', tab: 'images' })
+      return
+    case 'sound':
+      ui.setView({ kind: 'library', tab: 'sounds' })
       return
     case 'project':
       ui.openSheet({ kind: 'settings', page: 'general' })

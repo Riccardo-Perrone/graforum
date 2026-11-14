@@ -2,11 +2,11 @@ import { readFile, rename, copyFile, writeFile, access } from 'node:fs/promises'
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { MEDIA_ROOT, Project, cleanFolder, loadProject, mediaEntryPath } from '@shared/model'
 
-// File `.dng`: zip con project.json e le cartelle media/ e sound/ (§2 di docs/modello-dati-v3.md).
+// File `.foru`: zip con project.json e le cartelle media/ e sound/ (§2 di docs/modello-dati-v3.md).
 
 const PROJECT_ENTRY = 'project.json'
 
-/** Miniatura di un'immagine: salvata nel `.dng` come `thumbs/<id>.jpg|png` per non rifarla a ogni apertura. */
+/** Miniatura di un'immagine: salvata nel `.foru` come `thumbs/<id>.jpg|png` per non rifarla a ogni apertura. */
 export type Thumb = { data: Uint8Array; mime: 'image/jpeg' | 'image/png' }
 export const thumbEntryName = (id: string, mime: Thumb['mime']) => `thumbs/${id}.${mime === 'image/png' ? 'png' : 'jpg'}`
 

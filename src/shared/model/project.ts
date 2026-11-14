@@ -14,14 +14,14 @@ export const Image = z.object({
   title: z.string().default(''),
   tags: z.array(z.string()).default([]),
   mime: z.string(),
-  /** Cartella in libreria ("A/B"), uguale a quella dentro il .dng. Vuota = radice. */
+  /** Cartella in libreria ("A/B"), uguale a quella dentro il .foru. Vuota = radice. */
   folder: z.string().default(''),
   width: z.number().int().nullable().default(null),
   height: z.number().int().nullable().default(null)
 })
 export type Image = z.infer<typeof Image>
 
-/** Suono della libreria (musica, effetti, ambienti). Il file viene copiato nel `.dng` sotto `sound/`. */
+/** Suono della libreria (musica, effetti, ambienti). Il file viene copiato nel `.foru` sotto `sound/`. */
 export const Sound = z.object({
   id: Id,
   fileName: z.string(),

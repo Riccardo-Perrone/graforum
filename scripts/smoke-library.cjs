@@ -15,7 +15,7 @@ const mp3 = path.join(tmp, 'prova.mp3')
 fs.writeFileSync(mp3, Buffer.concat(Array.from({ length: 100 }, () => frame)))
 const png = path.join(tmp, 'pixel.png')
 fs.writeFileSync(png, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64'))
-const dng = path.join(tmp, 'prova.dng')
+const foruPath = path.join(tmp, 'prova.foru')
 // Un png grande (800x600) per provare le miniature.
 const zlib = require('zlib')
 const crcTable = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0 })
@@ -132,8 +132,8 @@ const PAGE_TEST = `(async () => {
   seg[2]?.click(); await sleep(250)
   check(stores.ui.getState().libraryView === 'large', 'il selettore non passa alla vista icone grandi')
 
-  // 5. Salvataggio: le cartelle sono vere dentro il .dng.
-  const res = await window.graforum.saveProject(proj(), window.__dng)
+  // 5. Salvataggio: le cartelle sono vere dentro il .foru.
+  const res = await window.graforum.saveProject(proj(), window.__foru)
   check(res.ok, 'salvataggio fallito')
 
   // 6. Immagini: stesse cartelle, nessun player.
@@ -147,7 +147,7 @@ const PAGE_TEST = `(async () => {
   await drag(row(), node('Mappe'))
   check(proj().images[0].folder === 'Mappe', 'immagine non spostata in Mappe')
 
-  // 6b. Miniature: un png grande ha una miniatura di 400 px, salvata nel .dng; una piccola resta com'è.
+  // 6b. Miniature: un png grande ha una miniatura di 400 px, salvata nel .foru; una piccola resta com'è.
   window.__pick = ['BIG']
   document.querySelector('[data-testid=library-upload]').click(); await sleep(900)
   check(proj().images.length === 2, 'il png grande non è entrato in libreria')
@@ -161,7 +161,7 @@ const PAGE_TEST = `(async () => {
   check(small && small[0] === 1, 'un immagine già piccola deve usare l originale: ' + JSON.stringify(small))
   check(q('[data-testid=media-item] img').some((im) => im.src.includes('/thumb/')), 'la Libreria non mostra le miniature')
   window.__bigId = bigImg.id
-  const res2 = await window.graforum.saveProject(proj(), window.__dng)
+  const res2 = await window.graforum.saveProject(proj(), window.__foru)
   check(res2.ok, 'secondo salvataggio fallito')
 
   // 6c. Albero delle cartelle collassabile; Nuova cartella e comprimi stanno in cima all albero.
@@ -198,16 +198,16 @@ app.whenReady().then(async () => {
   await wait(800)
   await win.webContents.executeJavaScript("[...document.querySelectorAll('button')].find((b) => b.textContent.includes('esempio')).click()")
   await wait(1500)
-  await win.webContents.executeJavaScript(`window.__dng = ${JSON.stringify(dng)}`)
+  await win.webContents.executeJavaScript(`window.__foru = ${JSON.stringify(foruPath)}`)
   const fails = await win.webContents.executeJavaScript(PAGE_TEST)
   // Controllo del file salvato: cartelle reali dentro lo zip.
   try {
     const { unzipSync } = require('fflate')
-    const names = Object.keys(unzipSync(new Uint8Array(fs.readFileSync(dng))))
-    if (!names.some((n) => /^thumbs\/img_.+\.png$/.test(n))) fails.push('il .dng non contiene la miniatura in thumbs/: ' + names.join(', '))
-    if (!names.some((n) => /^sound\/Ambiente\/Taverna\/snd_.+\.mp3$/.test(n))) fails.push('il .dng non contiene il suono in sound/Ambiente/Taverna: ' + names.join(', '))
+    const names = Object.keys(unzipSync(new Uint8Array(fs.readFileSync(foruPath))))
+    if (!names.some((n) => /^thumbs\/img_.+\.png$/.test(n))) fails.push('il .foru non contiene la miniatura in thumbs/: ' + names.join(', '))
+    if (!names.some((n) => /^sound\/Ambiente\/Taverna\/snd_.+\.mp3$/.test(n))) fails.push('il .foru non contiene il suono in sound/Ambiente/Taverna: ' + names.join(', '))
   } catch (e) {
-    fails.push('lettura del .dng: ' + e.message)
+    fails.push('lettura del .foru: ' + e.message)
   }
   console.log(fails.length ? 'FALLITO:\n- ' + fails.join('\n- ') : 'OK: libreria, player, cartelle, viste, miniature')
   fs.rmSync(tmp, { recursive: true, force: true })

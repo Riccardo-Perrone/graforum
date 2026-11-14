@@ -59,7 +59,7 @@ export function ImagePicker({ value, onPick, onClose }: { value?: string | null;
       height={900}
       onClose={onClose}
       bodyClassName="flex"
-      footer={<span>Le immagini vengono copiate nel file .dng</span>}
+      footer={<span>Le immagini vengono copiate nel file .foru</span>}
     >
       <aside className="flex w-[220px] flex-none flex-col gap-1 overflow-y-auto border-r border-line p-3">
         <span className="px-2 pb-1 font-mono text-[10px] font-semibold tracking-[.1em] text-tx3">TAG</span>

@@ -19,7 +19,7 @@ Il codice di riferimento è `src/shared/model/` (schemi Zod): questo documento n
 | 9 | Schede NPC ed enemy con tutti i campi del modello standard, nello stile del design. |
 | 10 | Oggetto: campi "impilabile" e "consumabile". |
 | 11 | Il **negozio sta nell'NPC** (Servizi: merce, prezzo, scorta). Gli "oggetti presenti" della scena servono per casse e ritrovamenti. |
-| 12 | Progetto in un **unico file `.dng`**. Il progetto di esempio "La locanda del Corvo" è incluso nell'app. |
+| 12 | Progetto in un **unico file `.foru`**. Il progetto di esempio "La locanda del Corvo" è incluso nell'app. |
 | 13 | Impostazioni dell'app: **scala dell'interfaccia** e **dimensione del testo**, indipendenti dallo zoom del canvas. |
 | 14 | Le fasi di implementazione sono state riordinate per dipendenza (sezione 9, ora completata). |
 | 15 | I gruppi hanno **più scene di entrata e più scene di uscita**. |
@@ -44,9 +44,9 @@ Il codice di riferimento è `src/shared/model/` (schemi Zod): questo documento n
 | npcs, enemies, items, quests, dialogs | elenchi | Cataloghi |
 | images, sounds, flags, documents, presets | elenchi | |
 
-**File `.dng`** = archivio zip con `project.json`, `media/` e `sound/` (con le sottocartelle della libreria). Il salvataggio è atomico (file temporaneo + rinomina) e mantiene una copia `.bak`. L'autosalvataggio scrive allo stesso modo.
+**File `.foru`** = archivio zip con `project.json`, `media/` e `sound/` (con le sottocartelle della libreria). Il salvataggio è atomico (file temporaneo + rinomina) e mantiene una copia `.bak`. L'autosalvataggio scrive allo stesso modo.
 
-**Versione del formato.** Esiste un solo formato: nessun progetto precedente va mantenuto leggibile, quindi non ci sono migrazioni. `schemaVersion` (costante `SCHEMA_VERSION` in `src/shared/model/project.ts`) si scrive nel file; all'apertura (file `.dng` e import JSON) `loadProject` (`model/load.ts`) rifiuta con un errore chiaro un file più recente dell'app, senza toccarlo, e valida il resto con lo schema. Se un giorno ci saranno file in circolazione da proteggere, qui andranno reintrodotte le migrazioni.
+**Versione del formato.** Esiste un solo formato: nessun progetto precedente va mantenuto leggibile, quindi non ci sono migrazioni. `schemaVersion` (costante `SCHEMA_VERSION` in `src/shared/model/project.ts`) si scrive nel file; all'apertura (file `.foru` e import JSON) `loadProject` (`model/load.ts`) rifiuta con un errore chiaro un file più recente dell'app, senza toccarlo, e valida il resto con lo schema. Se un giorno ci saranno file in circolazione da proteggere, qui andranno reintrodotte le migrazioni.
 
 Le preferenze dell'app (tema, scala interfaccia, dimensione testo, aggancio dei nodi, scorciatoie, ricerca automatica degli aggiornamenti, disposizione delle schede, progetti recenti) non stanno nel progetto ma nel browser storage dell'app (localStorage).
 
@@ -188,8 +188,8 @@ Un dialogo è "solo contesto" se non contiene effetti né prove: è calcolato, n
 
 ## 6. Libreria, flag, documenti, preset
 
-- **Immagine:** `fileName`, `title`, `tags`, `mime`, `width`, `height`. Il file viene copiato nel `.dng`.
-- **Suono:** `fileName`, `title`, `tags`, `mime`, `folder`. Il file viene copiato nel `.dng` sotto `sound/<folder>/<id>.<ext>`. Lo stesso vale per i media (`media/…`, con le miniature in `thumbs/<id>.jpg|png`). `folder` è un percorso "A/B" (vuoto = radice) che coincide con le cartelle dentro lo zip; `Project.imageFolders` / `soundFolders` elencano le cartelle (anche vuote) che compaiono come cartelle vere nello zip. I tag restano un'altra dimensione, indipendente dalle cartelle. Una scena li associa con `soundIds` (elenco, anche vuoto); un suono associato non si elimina finché è usato. Campi aggiunti con valore predefinito: i `.dng` precedenti si leggono senza migrazione.
+- **Immagine:** `fileName`, `title`, `tags`, `mime`, `width`, `height`. Il file viene copiato nel `.foru`.
+- **Suono:** `fileName`, `title`, `tags`, `mime`, `folder`. Il file viene copiato nel `.foru` sotto `sound/<folder>/<id>.<ext>`. Lo stesso vale per i media (`media/…`, con le miniature in `thumbs/<id>.jpg|png`). `folder` è un percorso "A/B" (vuoto = radice) che coincide con le cartelle dentro lo zip; `Project.imageFolders` / `soundFolders` elencano le cartelle (anche vuote) che compaiono come cartelle vere nello zip. I tag restano un'altra dimensione, indipendente dalle cartelle. Una scena li associa con `soundIds` (elenco, anche vuoto); un suono associato non si elimina finché è usato. Campi aggiunti con valore predefinito: i `.foru` precedenti si leggono senza migrazione.
 - **Flag:** `name`, `description`, `defaultValue`.
 - **Documento:** `title`, `markdown`, `order`.
   - I link alle entità usano la sintassi `@[Testo visibile](tipo:id)`, ad esempio `@[Oste Bruno](npc:npc_V1StGXR8Z5)`.
@@ -210,7 +210,7 @@ abilità (nome + caratteristica), tipi di oggetto, oggetto valuta, definizioni d
 ## 9. Fasi di implementazione (completate)
 
 1. **Fondamenta.**
-   - Shell dell'app, Home e file `.dng`, con autosalvataggio e annulla/ripeti.
+   - Shell dell'app, Home e file `.foru`, con autosalvataggio e annulla/ripeti.
    - Modello completo e motore di condizioni ed effetti.
    - Impostazioni (con la scala dell'interfaccia).
    - Libreria immagini, cataloghi completi con "Usato in", editor condizioni.

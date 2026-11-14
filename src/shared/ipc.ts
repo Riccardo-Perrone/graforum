@@ -1,6 +1,6 @@
 import type { Project } from './model'
 
-/** Esito dell'apertura o del salvataggio di un file `.dng`. */
+/** Esito dell'apertura o del salvataggio di un file `.foru`. */
 export type FileResult =
   | { ok: true; path: string; project: Project }
   | { ok: false; canceled: true }

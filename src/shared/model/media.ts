@@ -1,9 +1,9 @@
 // Cartelle della libreria (immagini e suoni). Il percorso di una cartella è "A/B/C" (vuoto = radice)
-// e coincide con le cartelle dentro il `.dng` (`media/A/B/<id>.png`), così libreria ed esplora file mostrano lo stesso albero.
+// e coincide con le cartelle dentro il `.foru` (`media/A/B/<id>.png`), così libreria ed esplora file mostrano lo stesso albero.
 
 export type MediaKind = 'image' | 'sound'
 
-/** Cartella radice di ciascun tipo dentro il `.dng` e nei pacchetti di esportazione. */
+/** Cartella radice di ciascun tipo dentro il `.foru` e nei pacchetti di esportazione. */
 export const MEDIA_ROOT: Record<MediaKind, string> = { image: 'media', sound: 'sound' }
 
 const FORBIDDEN = /[\/:*?"<>|\u0000-\u001f]/
@@ -41,7 +41,7 @@ export const reparent = (path: string, from: string, to: string): string => (isI
 
 const extOf = (fileName: string) => fileName.match(/\.[a-z0-9]+$/i)?.[0]?.toLowerCase() ?? ''
 
-/** Percorso del file nel `.dng` e nei pacchetti: `media/<cartella>/<id>.<ext>`. */
+/** Percorso del file nel `.foru` e nei pacchetti: `media/<cartella>/<id>.<ext>`. */
 export const mediaEntryPath = (kind: MediaKind, m: { id: string; fileName: string; folder?: string }): string =>
   [MEDIA_ROOT[kind], cleanFolder(m.folder ?? ''), `${m.id}${extOf(m.fileName)}`].filter(Boolean).join('/')
 
